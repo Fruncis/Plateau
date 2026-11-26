@@ -2,6 +2,8 @@ package com.plateau.app.ui.importreview
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.plateau.app.data.local.entity.Exercise
+import com.plateau.app.data.local.entity.MuscleGroup
 import com.plateau.app.data.local.entity.SetLog
 import com.plateau.app.data.repository.ExerciseRepository
 import com.plateau.app.data.repository.SessionRepository
@@ -54,6 +56,63 @@ class ImportReviewViewModel @Inject constructor(
                         error = throwable.message ?: "Testo non leggibile"
                     )
                 }
+        }
+    }
+
+    fun loadMuscleGroups() {
+        viewModelScope.launch {
+            runCatching { exerciseRepository.getMuscleGroups().first() }
+                .onSuccess { _uiState.value = _uiState.value.copy(muscleGroups = it) }
+        }
+    }
+
+    /** Exercise text of an unmatched line: everything before the set notation. */
+    fun exerciseTextOf(line: String): String = line.substring(0, setNotationStart(line)).trim()
+
+    private fun setNotationStart(line: String): Int {
+        val m = Regex("""\s+\d+\s*[x\u00d7]\s*\d+|\s+\d+(?:\.\d+)?kgx\d+""").find(line)
+        return m?.range?.first ?: line.length
+    }
+
+    fun onAddAsNew(index: Int, name: String, muscleId: String) {
+        val unmatched = _uiState.value.unmatched.getOrNull(index) ?: return
+        val cleanName = name.trim()
+        if (cleanName.isEmpty()) return
+        viewModelScope.launch {
+            runCatching {
+                val exercise = Exercise(
+                    id = UUID.randomUUID().toString(),
+                    name = cleanName,
+                    aliases = "[]",
+                    primaryMuscleId = muscleId,
+                    secondaryMuscleId = null,
+                    movementPattern = "push",
+                    equipment = "bodyweight",
+                    difficulty = 1,
+                    isCompound = false,
+                    instructions = "",
+                    source = "imported"
+                )
+                exerciseRepository.insertExercise(exercise)
+                val catalog = exerciseRepository.getAllExercises().first() + exercise
+                val line = cleanName + unmatched.line.substring(setNotationStart(unmatched.line))
+                val result = ImportParser.parse(line, catalog)
+                val muscleName = _uiState.value.muscleGroups.firstOrNull { it.id == muscleId }?.name
+                    ?: exerciseRepository.getMuscleGroupName(muscleId).orEmpty()
+                Triple(result as? ImportResult.Success, exercise.name, muscleName)
+            }.onSuccess { (parsed, exerciseName, muscleName) ->
+                if (parsed != null) {
+                    val state = _uiState.value
+                    val remaining = state.unmatched.toMutableList().also { it.remove(unmatched) }
+                    _uiState.value = state.copy(
+                        editedWorkouts = state.editedWorkouts + parsed.workouts,
+                        unmatched = remaining,
+                        primaryMuscleNames = state.primaryMuscleNames + (exerciseName to muscleName)
+                    )
+                }
+            }.onFailure { throwable ->
+                _uiState.value = _uiState.value.copy(error = throwable.message ?: "Impossibile aggiungere l'esercizio")
+            }
         }
     }
 
@@ -114,6 +173,7 @@ data class ImportReviewUiState(
     val editedWorkouts: List<ParsedWorkout> = emptyList(),
     val unmatched: List<ImportResult.UnmatchedLine> = emptyList(),
     val primaryMuscleNames: Map<String, String> = emptyMap(),
+    val muscleGroups: List<MuscleGroup> = emptyList(),
     val isImporting: Boolean = false,
     val imported: Boolean = false,
     val error: String? = null

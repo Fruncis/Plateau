@@ -119,4 +119,23 @@ class ImportReviewViewModelTest {
 
         assertEquals(85.0, vm.uiState.value.editedWorkouts[0].sets[0].weight, 0.0)
     }
+
+    @Test
+    fun `adding unmatched line as new exercise moves it into workouts`() = runTest {
+        val vm = viewModel()
+        vm.setImportResult(
+            ImportResult.Partial(emptyList(), listOf(ImportResult.UnmatchedLine("Esercizio Sconosciuto 3x10 50kg", emptyList())))
+        )
+        assertEquals("Esercizio Sconosciuto", vm.exerciseTextOf("Esercizio Sconosciuto 3x10 50kg"))
+
+        vm.onAddAsNew(0, "Esercizio Sconosciuto", "chest")
+
+        val captor = argumentCaptor<Exercise>()
+        verify(exerciseRepository, times(1)).insertExercise(captor.capture())
+        assertEquals("imported", captor.firstValue.source)
+        val state = vm.uiState.value
+        assertTrue(state.unmatched.isEmpty())
+        assertEquals(1, state.editedWorkouts.size)
+        assertEquals(3, state.editedWorkouts[0].sets.size)
+    }
 }

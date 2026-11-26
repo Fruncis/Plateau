@@ -1,6 +1,9 @@
 package com.plateau.app.ui.importreview
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -29,6 +32,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
+import com.plateau.app.data.local.entity.MuscleGroup
 import com.plateau.app.domain.service.ImportResult
 import com.plateau.app.domain.service.ParsedSet
 import com.plateau.app.domain.service.ParsedWorkout
@@ -53,6 +57,9 @@ fun ImportReviewRoute(
         state = state,
         onDismissUnmatched = viewModel::onDismissUnmatched,
         onEditWorkout = viewModel::onEditWorkout,
+        onAddAsNew = viewModel::onAddAsNew,
+        exerciseTextOf = viewModel::exerciseTextOf,
+        onOpenAddSheet = viewModel::loadMuscleGroups,
         onConfirm = viewModel::onConfirmImport,
         onCancel = onCancel
     )
@@ -76,6 +83,9 @@ fun ImportReviewScreen(
         state = state,
         onDismissUnmatched = viewModel::onDismissUnmatched,
         onEditWorkout = viewModel::onEditWorkout,
+        onAddAsNew = viewModel::onAddAsNew,
+        exerciseTextOf = viewModel::exerciseTextOf,
+        onOpenAddSheet = viewModel::loadMuscleGroups,
         onConfirm = viewModel::onConfirmImport,
         onCancel = onCancel
     )
@@ -86,6 +96,9 @@ private fun ImportReviewContent(
     state: ImportReviewUiState,
     onDismissUnmatched: (Int) -> Unit,
     onEditWorkout: (Int, ParsedWorkout) -> Unit,
+    onAddAsNew: (Int, String, String) -> Unit,
+    exerciseTextOf: (String) -> String,
+    onOpenAddSheet: () -> Unit,
     onConfirm: () -> Unit,
     onCancel: () -> Unit
 ) {
@@ -96,6 +109,17 @@ private fun ImportReviewContent(
                 workout = workout,
                 onSave = { onEditWorkout(index, it); editingIndex = null },
                 onDismiss = { editingIndex = null }
+            )
+        }
+    }
+    var addingIndex by remember { mutableStateOf<Int?>(null) }
+    addingIndex?.let { index ->
+        state.unmatched.getOrNull(index)?.let { unmatched ->
+            AddAsNewSheet(
+                initialName = exerciseTextOf(unmatched.line),
+                muscleGroups = state.muscleGroups,
+                onConfirm = { name, muscleId -> onAddAsNew(index, name, muscleId); addingIndex = null },
+                onDismiss = { addingIndex = null }
             )
         }
     }
@@ -148,7 +172,10 @@ private fun ImportReviewContent(
                                     )
                                 }
                             }
-                            TextButton(onClick = { onDismissUnmatched(index) }) { Text("Rimuovi") }
+                            Column(horizontalAlignment = Alignment.End) {
+                                TextButton(onClick = { onOpenAddSheet(); addingIndex = index }) { Text("Aggiungi come nuovo") }
+                                TextButton(onClick = { onDismissUnmatched(index) }) { Text("Rimuovi") }
+                            }
                         }
                     }
                 }
@@ -212,6 +239,50 @@ private fun WorkoutReviewCard(index: Int, workout: ParsedWorkout, primaryMuscle:
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@Composable
+private fun AddAsNewSheet(
+    initialName: String,
+    muscleGroups: List<MuscleGroup>,
+    onConfirm: (String, String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var name by remember { mutableStateOf(initialName) }
+    var picked by remember { mutableStateOf<String?>(null) }
+    val muscleId = picked ?: muscleGroups.firstOrNull()?.id
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.xl, vertical = Spacing.lg),
+            verticalArrangement = Arrangement.spacedBy(Spacing.md)
+        ) {
+            Text("Nuovo esercizio", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface)
+            OutlinedTextField(
+                value = name,
+                onValueChange = { name = it },
+                label = { Text("Nome") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+            Text("Muscolo primario", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                muscleGroups.forEach { group ->
+                    MuscleChip(
+                        label = group.name,
+                        emphasized = group.id == muscleId,
+                        modifier = Modifier.clickable { picked = group.id }
+                    )
+                }
+            }
+            TextButton(
+                onClick = { muscleId?.let { onConfirm(name, it) } },
+                enabled = name.isNotBlank() && muscleId != null,
+                modifier = Modifier.align(Alignment.End)
+            ) { Text("Aggiungi") }
+            Spacer(Modifier.height(Spacing.lg))
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun EditWorkoutSheet(workout: ParsedWorkout, onSave: (ParsedWorkout) -> Unit, onDismiss: () -> Unit) {
@@ -269,7 +340,7 @@ private fun ImportReviewDarkPreview() = PlateauTheme(darkTheme = true) {
             editedWorkouts = listOf(ParsedWorkout("Panca piana", listOf(ParsedSet(80.0, 10), ParsedSet(80.0, 10), ParsedSet(80.0, 10)))),
             unmatched = listOf(ImportResult.UnmatchedLine("Esercizio sconosciuto 3x10 40kg", listOf("Panca piana")))
         ),
-        onDismissUnmatched = {}, onEditWorkout = { _, _ -> }, onConfirm = {}, onCancel = {}
+        onDismissUnmatched = {}, onEditWorkout = { _, _ -> }, onAddAsNew = { _, _, _ -> }, exerciseTextOf = { it }, onOpenAddSheet = {}, onConfirm = {}, onCancel = {}
     )
 }
 
@@ -281,7 +352,7 @@ private fun ImportReviewLightPreview() = PlateauTheme(darkTheme = false) {
             importResult = ImportResult.Success(emptyList()),
             editedWorkouts = listOf(ParsedWorkout("Panca piana", listOf(ParsedSet(80.0, 10), ParsedSet(80.0, 10), ParsedSet(80.0, 10))))
         ),
-        onDismissUnmatched = {}, onEditWorkout = { _, _ -> }, onConfirm = {}, onCancel = {}
+        onDismissUnmatched = {}, onEditWorkout = { _, _ -> }, onAddAsNew = { _, _, _ -> }, exerciseTextOf = { it }, onOpenAddSheet = {}, onConfirm = {}, onCancel = {}
     )
 }
 
@@ -290,6 +361,6 @@ private fun ImportReviewLightPreview() = PlateauTheme(darkTheme = false) {
 private fun ImportReviewErrorPreview() = PlateauTheme(darkTheme = true) {
     ImportReviewContent(
         state = ImportReviewUiState(importResult = ImportResult.Failure("Input is empty"), error = "Input is empty"),
-        onDismissUnmatched = {}, onEditWorkout = { _, _ -> }, onConfirm = {}, onCancel = {}
+        onDismissUnmatched = {}, onEditWorkout = { _, _ -> }, onAddAsNew = { _, _, _ -> }, exerciseTextOf = { it }, onOpenAddSheet = {}, onConfirm = {}, onCancel = {}
     )
 }

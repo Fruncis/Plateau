@@ -10,7 +10,7 @@ import com.plateau.app.domain.service.ParsedSet
 import com.plateau.app.domain.service.ParsedWorkout
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -22,6 +22,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.mockito.kotlin.any
+import org.mockito.kotlin.doAnswer
+import org.mockito.kotlin.never
 import org.mockito.kotlin.argumentCaptor
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.times
@@ -40,11 +42,14 @@ class ImportReviewViewModelTest {
         difficulty = 1, isCompound = true, instructions = "", source = "catalog"
     )
     private val squat = bench.copy(id = "squat", name = "Squat", primaryMuscleId = "legs")
+    private val catalog = MutableStateFlow(listOf(bench, squat))
 
     @Before
     fun setUp() = runTest {
         Dispatchers.setMain(UnconfinedTestDispatcher())
-        whenever(exerciseRepository.getAllExercises()).thenReturn(flowOf(listOf(bench, squat)))
+        whenever(exerciseRepository.getAllExercises()).thenReturn(catalog)
+        doAnswer { catalog.value = catalog.value + (it.arguments[0] as Exercise); Unit }
+            .whenever(exerciseRepository).insertExercise(any())
         whenever(exerciseRepository.getMuscleGroupName(any())).thenReturn("Petto")
         whenever(sessionRepository.startSession(null))
             .thenReturn(WorkoutSession(id = "s1", planDayId = null, date = 0L, durationSec = 0))
@@ -137,5 +142,48 @@ class ImportReviewViewModelTest {
         assertTrue(state.unmatched.isEmpty())
         assertEquals(1, state.editedWorkouts.size)
         assertEquals(3, state.editedWorkouts[0].sets.size)
+    }
+
+    @Test
+    fun `adding a line whose name already exists reuses it without inserting`() = runTest {
+        val vm = viewModel()
+        vm.setImportResult(
+            ImportResult.Partial(emptyList(), listOf(ImportResult.UnmatchedLine("Panca pianaa 3x10 50kg", emptyList())))
+        )
+
+        vm.onAddAsNew(0, "panca PIANA", "chest")
+
+        verify(exerciseRepository, never()).insertExercise(any())
+        val state = vm.uiState.value
+        assertEquals(listOf("Panca piana"), state.editedWorkouts.map { it.exerciseName })
+        assertEquals(1, catalog.value.count { it.name.equals("Panca piana", ignoreCase = true) })
+    }
+
+    @Test
+    fun `adding a line with unparsable sets keeps it unmatched, shows error and does not insert`() = runTest {
+        val vm = viewModel()
+        vm.setImportResult(
+            ImportResult.Partial(emptyList(), listOf(ImportResult.UnmatchedLine("Nuovo 3x10", emptyList())))
+        )
+
+        vm.onAddAsNew(0, "Nuovo", "chest")
+
+        verify(exerciseRepository, never()).insertExercise(any())
+        val state = vm.uiState.value
+        assertEquals(1, state.unmatched.size)
+        assertTrue(state.editedWorkouts.isEmpty())
+        assertNotNull(state.error)
+    }
+
+    @Test
+    fun `parsing the same input again keeps user edits`() = runTest {
+        val vm = viewModel()
+        vm.parseImportText("Panca piana 3x10 80kg\nIgnoto 3x10 40kg")
+        assertEquals(1, vm.uiState.value.unmatched.size)
+        vm.onDismissUnmatched(0)
+
+        vm.parseImportText("Panca piana 3x10 80kg\nIgnoto 3x10 40kg")
+
+        assertTrue(vm.uiState.value.unmatched.isEmpty())
     }
 }

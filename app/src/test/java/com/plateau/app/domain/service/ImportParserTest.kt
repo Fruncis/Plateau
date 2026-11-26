@@ -193,4 +193,32 @@ class ImportParserTest {
         assertEquals(1, partial.unmatchedLines.size)
         assertTrue(partial.unmatchedLines[0].suggestions.contains("Panca piana"))
     }
+
+    @Test
+    fun `splitLine separates exercise text from standard notation`() {
+        val split = ImportParser.splitLine("Esercizio Sconosciuto 3x10 50kg")
+        assertEquals("Esercizio Sconosciuto", split.exerciseName)
+        assertEquals(" 3x10 50kg", split.notation)
+    }
+
+    @Test
+    fun `splitLine handles spaced and weight-first notation`() {
+        assertEquals("Curl", ImportParser.splitLine("Curl 3 x 10 @ 40").exerciseName)
+        assertEquals("Row", ImportParser.splitLine("Row 80kg x 5").exerciseName)
+        assertEquals("Row", ImportParser.splitLine("Row 80kgx10, 70kgx10").exerciseName)
+    }
+
+    @Test
+    fun `splitLine without notation keeps whole line as name`() {
+        val split = ImportParser.splitLine("Solo testo")
+        assertEquals("Solo testo", split.exerciseName)
+        assertEquals("", split.notation)
+    }
+
+    @Test
+    fun `splitLine rebuilds a parsable line with a new name`() {
+        val split = ImportParser.splitLine("Esercizio Sconosciuto 3x10 50kg")
+        val result = ImportParser.parse("Squat" + split.notation, catalog)
+        assertTrue(result is ImportResult.Success)
+    }
 }

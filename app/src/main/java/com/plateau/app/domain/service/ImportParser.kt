@@ -56,6 +56,21 @@ object ImportParser {
         }
     }
 
+    /** Where the set notation starts in a line: "3x10", "3 x 10" or "80kg x 5" after the exercise text. */
+    private val notationStartRegex =
+        """\s+(?:\d+\s*[x\u00d7]\s*\d+|\d+(?:\.\d+)?\s*kg\s*[x\u00d7]\s*\d+)""".toRegex(RegexOption.IGNORE_CASE)
+
+    /**
+     * Splits a line into the exercise text and the set notation that follows it.
+     * [SplitLine.notation] keeps its leading whitespace, so `exerciseName + notation` rebuilds the line.
+     * A line without recognisable notation yields an empty notation.
+     */
+    fun splitLine(line: String): SplitLine {
+        val trimmed = line.trim()
+        val start = notationStartRegex.find(trimmed)?.range?.first ?: trimmed.length
+        return SplitLine(trimmed.substring(0, start).trim(), trimmed.substring(start))
+    }
+
     /**
      * Parses a single line of input.
      */
@@ -255,6 +270,9 @@ sealed class ImportResult {
     /** A line that couldn't be matched to an exercise */
     data class UnmatchedLine(val line: String, val suggestions: List<String>)
 }
+
+/** A workout line split into exercise text and set notation (see [ImportParser.splitLine]). */
+data class SplitLine(val exerciseName: String, val notation: String)
 
 /**
  * Represents a parsed workout with its exercise name and sets.

@@ -37,7 +37,12 @@ class ImportReviewViewModel @Inject constructor(
         )
     }
 
+    private var loadedInput: String? = null
+
     fun parseImportText(input: String) {
+        // Re-entering composition (rotation, recreation) must not discard the user's edits.
+        if (loadedInput == input) return
+        loadedInput = input
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isImporting = true, error = null)
             runCatching {
@@ -51,6 +56,7 @@ class ImportReviewViewModel @Inject constructor(
                 result to muscleNames
             }.onSuccess { (result, muscleNames) -> setImportResult(result, muscleNames) }
                 .onFailure { throwable ->
+                    loadedInput = null
                     _uiState.value = _uiState.value.copy(
                         isImporting = false,
                         error = throwable.message ?: "Testo non leggibile"
@@ -67,12 +73,7 @@ class ImportReviewViewModel @Inject constructor(
     }
 
     /** Exercise text of an unmatched line: everything before the set notation. */
-    fun exerciseTextOf(line: String): String = line.substring(0, setNotationStart(line)).trim()
-
-    private fun setNotationStart(line: String): Int {
-        val m = Regex("""\s+\d+\s*[x\u00d7]\s*\d+|\s+\d+(?:\.\d+)?kgx\d+""").find(line)
-        return m?.range?.first ?: line.length
-    }
+    fun exerciseTextOf(line: String): String = ImportParser.splitLine(line).exerciseName
 
     fun onAddAsNew(index: Int, name: String, muscleId: String) {
         val unmatched = _uiState.value.unmatched.getOrNull(index) ?: return
@@ -80,7 +81,9 @@ class ImportReviewViewModel @Inject constructor(
         if (cleanName.isEmpty()) return
         viewModelScope.launch {
             runCatching {
-                val exercise = Exercise(
+                val catalog = exerciseRepository.getAllExercises().first()
+                val existing = catalog.firstOrNull { it.name.trim().equals(cleanName, ignoreCase = true) }
+                val candidate = existing ?: Exercise(
                     id = UUID.randomUUID().toString(),
                     name = cleanName,
                     aliases = "[]",
@@ -93,21 +96,25 @@ class ImportReviewViewModel @Inject constructor(
                     instructions = "",
                     source = "imported"
                 )
-                exerciseRepository.insertExercise(exercise)
-                val catalog = exerciseRepository.getAllExercises().first() + exercise
-                val line = cleanName + unmatched.line.substring(setNotationStart(unmatched.line))
-                val result = ImportParser.parse(line, catalog)
-                val muscleName = _uiState.value.muscleGroups.firstOrNull { it.id == muscleId }?.name
-                    ?: exerciseRepository.getMuscleGroupName(muscleId).orEmpty()
-                Triple(result as? ImportResult.Success, exercise.name, muscleName)
-            }.onSuccess { (parsed, exerciseName, muscleName) ->
+                val line = candidate.name + ImportParser.splitLine(unmatched.line).notation
+                val parsed = ImportParser.parse(line, if (existing == null) catalog + candidate else catalog)
+                    as? ImportResult.Success
                 if (parsed != null) {
-                    val state = _uiState.value
-                    val remaining = state.unmatched.toMutableList().also { it.remove(unmatched) }
+                    if (existing == null) exerciseRepository.insertExercise(candidate)
+                    val muscleName = exerciseRepository.getMuscleGroupName(candidate.primaryMuscleId).orEmpty()
+                    Triple(parsed, candidate.name, muscleName)
+                } else null
+            }.onSuccess { added ->
+                val state = _uiState.value
+                if (added == null) {
+                    _uiState.value = state.copy(error = "Formato serie non riconosciuto: ${unmatched.line}")
+                } else {
+                    val (parsed, exerciseName, muscleName) = added
                     _uiState.value = state.copy(
                         editedWorkouts = state.editedWorkouts + parsed.workouts,
-                        unmatched = remaining,
-                        primaryMuscleNames = state.primaryMuscleNames + (exerciseName to muscleName)
+                        unmatched = state.unmatched.toMutableList().also { it.remove(unmatched) },
+                        primaryMuscleNames = state.primaryMuscleNames + (exerciseName to muscleName),
+                        error = null
                     )
                 }
             }.onFailure { throwable ->

@@ -29,6 +29,14 @@ interface SetLogDao {
     @Query("SELECT * FROM set_logs WHERE completedAt >= :startDate ORDER BY completedAt DESC")
     fun getAllSince(startDate: Long): Flow<List<SetLog>>
 
+    @Query("""
+        SELECT s.* FROM set_logs s
+        INNER JOIN exercises e ON e.id = s.exerciseId
+        WHERE e.primaryMuscleId = :muscleId AND s.completedAt >= :startDate
+        ORDER BY s.completedAt DESC
+    """)
+    fun getByPrimaryMuscleSince(muscleId: String, startDate: Long): Flow<List<SetLog>>
+
     @Query("SELECT * FROM set_logs WHERE sessionId = :sessionId AND exerciseId = :exerciseId ORDER BY setIndex")
     suspend fun getBySessionAndExercise(sessionId: String, exerciseId: String): List<SetLog>
 

@@ -39,6 +39,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -89,7 +90,11 @@ fun AppNavHost(sharedText: String? = null, onSharedTextHandled: () -> Unit = {})
     }
     val currentDestination = remember { mutableStateOf<Destination>(Destination.Home) }
 
-    androidx.navigation.compose.NavHost(navController, "home") {
+    androidx.navigation.compose.NavHost(
+        navController = navController,
+        startDestination = "home",
+        modifier = Modifier.statusBarsPadding()
+    ) {
         composable("home") {
             HomeScreen(
                 viewModel = hiltViewModel<HomeViewModel>(),

@@ -22,8 +22,9 @@ Se cambia un valore, aggiorna `tokens.json`, il codice Kotlin e questo file nell
 | `PlateauTheme.extras.progress` | #7DD3A8 | #7DD3A8 | riempimenti positivi (check, pallini) |
 | `PlateauTheme.extras.progressText` | #7DD3A8 | #17744D | numeri/testo positivi (record, +kg) |
 | `PlateauTheme.extras.accentText` | #FF7A3D | #B93F08 | arancione usato come testo |
+| `PlateauTheme.extras.chartProgress` | #7DD3A8 | #17744D | segni grafici dei dati: arco degli anelli, linea e1RM, barre a target |
 
-Regole: l'arancione `primary` non va mai usato come testo su sfondo chiaro (usa `accentText`); il verde come testo usa sempre `progressText`.
+Regole: l'arancione `primary` non va mai usato come testo su sfondo chiaro (usa `accentText`); il verde come testo usa sempre `progressText`; i segni grafici dei dati (anelli, linee, barre) usano `chartProgress` (almeno 3:1 sulla superficie, WCAG 1.4.11).
 Il tema segue il sistema (`isSystemInDarkTheme()`).
 
 ## Tipografia
@@ -33,6 +34,7 @@ Titolo schermata: `headlineLarge`. Nome esercizio: `titleMedium`. Dati secondari
 ## Forme e spaziatura
 Card principali `shapes.large` (24), bottoni `shapes.medium` (18), campi e righe serie `shapes.small` (14), chip `PillShape`.
 Spaziatura da `Spacing.*` (4/8 dp), margine laterale `Spacing.xl` (20). Bottone alto `Size.buttonHeight` (56), tab bar `Size.tabBarHeight` (84).
+Grafici di Progressi: anello `Size.ringSize` (120) con tratto `Size.ringStroke` (12), grafico e1RM `Size.chartHeight` (200), volume `Size.chartHeightCompact` (160); linee `Size.chartLine` (2), punti `Size.chartPoint` (raggio 4), griglia `Size.chartGrid` (1), trattino target `Size.chartDash` (6).
 Icone a tratto da 2 dp con estremi arrotondati (Material Symbols "rounded", peso 400 o il più vicino).
 
 ## Componenti

@@ -101,6 +101,8 @@ class ExerciseRepository @Inject constructor(
 
     fun getCompoundExercises(): Flow<List<Exercise>> = exerciseDao.getCompoundExercises()
 
+    suspend fun insertExercise(exercise: Exercise) = exerciseDao.insertAll(listOf(exercise))
+
     suspend fun insertExercises(exercises: List<Exercise>) = exerciseDao.insertAll(exercises)
 
     suspend fun insertMuscleGroups(groups: List<MuscleGroup>) = muscleGroupDao.insertAll(groups)

@@ -23,7 +23,6 @@ android {
 
     buildFeatures {
         compose = true
-        viewBinding = true
     }
 
     packaging {
@@ -52,11 +51,6 @@ android {
             jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
         }
     }
-
-    composeOptions {
-    }
-
-    namespace = "com.plateau.app"
 
     kapt {
         correctErrorTypes = true
@@ -115,8 +109,6 @@ dependencies {
 
     // DataStore
     implementation("androidx.datastore:datastore-preferences:$datastore_version")
-    implementation("androidx.datastore:datastore-preferences-rxjava3:$datastore_version")
-    kapt("androidx.datastore:datastore-preferences:$datastore_version")
 
     // WorkManager
     implementation("androidx.work:work-runtime-ktx:$workmanager_version")
@@ -149,7 +141,13 @@ dependencies {
     testImplementation("org.mockito:mockito-core:5.14.0")
     testImplementation("org.mockito.kotlin:mockito-kotlin:5.1.0")
     testImplementation("androidx.arch.core:core-testing:2.2.0")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
     testImplementation("androidx.test.espresso:espresso-core:3.6.1")
+    androidTestImplementation(platform("androidx.compose:compose-bom:$compose_bom_version"))
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    androidTestImplementation("androidx.test:runner:1.6.2")
+    androidTestImplementation("androidx.test:core-ktx:1.6.1")
+    androidTestImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
     androidTestImplementation("androidx.compose.ui:ui-test-manifest")
     debugImplementation("androidx.compose.ui:ui-tooling")

@@ -166,7 +166,7 @@ private fun SetRow(setNumber: Int, weight: String, reps: String, isCurrent: Bool
                     imageVector = Icons.Filled.Check,
                     contentDescription = "Serie completata",
                     modifier = Modifier.size(24.dp),
-                    tint = PlateauTheme.extras.progress
+                    tint = PlateauTheme.extras.chartProgress
                 )
             }
         }

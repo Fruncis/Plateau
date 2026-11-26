@@ -1,5 +1,6 @@
 package com.plateau.app
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import dagger.hilt.android.AndroidEntryPoint
@@ -8,6 +9,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -31,12 +33,15 @@ import com.plateau.app.ui.discover.DiscoverViewModel
 import com.plateau.app.ui.progress.ProgressViewModel
 import com.plateau.app.ui.photo.PhotoViewModel
 import com.plateau.app.ui.importreview.ImportReviewRoute
+import com.plateau.app.ui.importreview.LimitedSharedText
+import com.plateau.app.ui.importreview.limitSharedText
 import com.plateau.app.ui.importreview.ImportReviewViewModel
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -44,8 +49,22 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+    private val sharedText = mutableStateOf<LimitedSharedText?>(null)
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        extractSharedText(intent)?.let { sharedText.value = it }
+    }
+
+    /** Shared text, capped by [limitSharedText] because it travels in the nav route (saved state). */
+    private fun extractSharedText(intent: Intent?): LimitedSharedText? =
+        if (intent?.action == Intent.ACTION_SEND && intent.type == "text/plain") {
+            intent.getStringExtra(Intent.EXTRA_TEXT)?.takeIf { it.isNotBlank() }?.let(::limitSharedText)
+        } else null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (savedInstanceState == null) sharedText.value = extractSharedText(intent)
         enableEdgeToEdge()
         setContent {
             PlateauTheme {
@@ -53,7 +72,10 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    AppNavHost()
+                    AppNavHost(
+                        sharedText = sharedText.value,
+                        onSharedTextHandled = { sharedText.value = null }
+                    )
                 }
             }
         }
@@ -61,11 +83,21 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun AppNavHost() {
+fun AppNavHost(sharedText: LimitedSharedText? = null, onSharedTextHandled: () -> Unit = {}) {
     val navController = rememberNavController()
+    LaunchedEffect(sharedText) {
+        sharedText?.let {
+            navController.navigate(Destination.ImportReview(it.text, it.truncated).route)
+            onSharedTextHandled()
+        }
+    }
     val currentDestination = remember { mutableStateOf<Destination>(Destination.Home) }
 
-    androidx.navigation.compose.NavHost(navController, "home") {
+    androidx.navigation.compose.NavHost(
+        navController = navController,
+        startDestination = "home",
+        modifier = Modifier.statusBarsPadding()
+    ) {
         composable("home") {
             HomeScreen(
                 viewModel = hiltViewModel<HomeViewModel>(),
@@ -128,11 +160,15 @@ fun AppNavHost() {
         }
         composable(
             route = Destination.importReviewPattern,
-            arguments = listOf(navArgument("input") { type = NavType.StringType })
+            arguments = listOf(
+                navArgument("input") { type = NavType.StringType },
+                navArgument("truncated") { type = NavType.BoolType; defaultValue = false }
+            )
         ) { backStackEntry ->
             ImportReviewRoute(
                 viewModel = hiltViewModel<ImportReviewViewModel>(),
                 input = backStackEntry.arguments?.getString("input").orEmpty(),
+                truncated = backStackEntry.arguments?.getBoolean("truncated") ?: false,
                 onCancel = { navController.popBackStack() },
                 onImported = { navController.popBackStack("home", inclusive = false) }
             )

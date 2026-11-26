@@ -1,5 +1,6 @@
 package com.plateau.app.data.repository
 
+import androidx.room.withTransaction
 import com.plateau.app.data.local.PlateauDatabase
 import com.plateau.app.data.local.dao.WorkoutSessionDao
 import com.plateau.app.data.local.dao.SetLogDao
@@ -26,6 +27,18 @@ class SessionRepository @Inject constructor(
         )
         sessionDao.insert(session)
         return session
+    }
+
+    /**
+     * Saves an imported workout atomically: the session and all of its [logs] are written in one
+     * transaction, so a failure leaves nothing behind and a retry cannot duplicate a partial import.
+     * Each log's sessionId is set to [session]'s id.
+     */
+    suspend fun importSession(session: WorkoutSession, logs: List<SetLog>) {
+        database.withTransaction {
+            sessionDao.insert(session)
+            setLogDao.insertAll(logs.map { it.copy(sessionId = session.id) })
+        }
     }
 
     suspend fun endSession(sessionId: String, durationSec: Int) {

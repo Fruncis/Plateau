@@ -16,6 +16,13 @@ import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
 
+ data class MuscleGroupGap(
+    val muscleGroup: MuscleGroup,
+    val currentVolume: Int,
+    val targetVolume: Int,
+    val deficitPercent: Int
+)
+
 @Singleton
 class ExerciseRepository @Inject constructor(
     private val database: PlateauDatabase
@@ -26,12 +33,47 @@ class ExerciseRepository @Inject constructor(
 
     fun getAllExercises(): Flow<List<Exercise>> = exerciseDao.getAll()
 
+    fun getMuscleGroups() = muscleGroupDao.getAll()
+
+    suspend fun getMuscleGroupName(muscleId: String): String? = muscleGroupDao.getById(muscleId)?.name
+
     fun getExercisesByMuscle(muscleId: String): Flow<List<Exercise>> = exerciseDao.getByMuscle(muscleId)
 
     fun getExercisesByDifficultyAndEquipment(maxDifficulty: Int, equipment: List<String>): Flow<List<Exercise>> =
         exerciseDao.getByDifficultyAndEquipment(maxDifficulty, equipment)
 
     fun searchExercises(query: String): Flow<List<Exercise>> = exerciseDao.search("%$query%")
+
+    fun getFilteredExercises(
+        muscleId: String?,
+        equipment: String?,
+        difficulty: Int?,
+        movementPattern: String?,
+        searchQuery: String?
+    ): Flow<List<Exercise>> = exerciseDao.getFiltered(
+        muscleId, equipment, difficulty, movementPattern, searchQuery
+    )
+
+    fun getVolumeGaps(): Flow<List<MuscleGroupGap>> {
+        val startOfWeek = System.currentTimeMillis() - WEEK_MILLIS
+        return combine(exerciseDao.getAll(), setLogDao.getAllSince(startOfWeek), muscleGroupDao.getAll()) {
+                exercises, logs, muscleGroups ->
+            val muscleByExercise = exercises.associate { it.id to it.primaryMuscleId }
+            val setsByMuscle = logs.mapNotNull { log -> muscleByExercise[log.exerciseId] }
+                .groupingBy { it }
+                .eachCount()
+            muscleGroups.map { muscle ->
+                val current = setsByMuscle[muscle.id] ?: 0
+                val target = WEEKLY_SET_TARGET
+                MuscleGroupGap(
+                    muscleGroup = muscle,
+                    currentVolume = current,
+                    targetVolume = target,
+                    deficitPercent = (((target - current).coerceAtLeast(0) * 100.0) / target).toInt()
+                )
+            }.filter { it.deficitPercent > 0 }.sortedByDescending { it.deficitPercent }
+        }
+    }
 
     fun getExerciseDetail(exerciseId: String): Flow<ExerciseDetail?> = exerciseDao.getById(exerciseId).map { exercise ->
         exercise?.let { buildExerciseDetail(it) }
@@ -61,4 +103,9 @@ class ExerciseRepository @Inject constructor(
     suspend fun insertExercises(exercises: List<Exercise>) = exerciseDao.insertAll(exercises)
 
     suspend fun insertMuscleGroups(groups: List<MuscleGroup>) = muscleGroupDao.insertAll(groups)
+
+    private companion object {
+        const val WEEK_MILLIS = 7L * 24 * 60 * 60 * 1000
+        const val WEEKLY_SET_TARGET = 10
+    }
 }

@@ -77,6 +77,7 @@ private fun BottomNavItem(
         Destination.Discover -> Search
         Destination.Progress -> TrendingUp
         Destination.Photo -> CameraAlt
+        is Destination.ImportReview -> Description
     }
 
     val color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant

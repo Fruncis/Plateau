@@ -35,4 +35,21 @@ interface ExerciseDao {
 
     @Query("SELECT * FROM exercises WHERE isCompound = 1 ORDER BY name")
     fun getCompoundExercises(): Flow<List<Exercise>>
+
+    @Query("""
+        SELECT * FROM exercises
+        WHERE (:muscleId IS NULL OR primaryMuscleId = :muscleId OR secondaryMuscleId = :muscleId)
+        AND (:equipment IS NULL OR equipment = :equipment)
+        AND (:difficulty IS NULL OR difficulty <= :difficulty)
+        AND (:movementPattern IS NULL OR movementPattern = :movementPattern)
+        AND (:searchQuery IS NULL OR name LIKE '%' || :searchQuery || '%' OR aliases LIKE '%' || :searchQuery || '%')
+        ORDER BY isCompound DESC, name
+    """)
+    fun getFiltered(
+        muscleId: String?,
+        equipment: String?,
+        difficulty: Int?,
+        movementPattern: String?,
+        searchQuery: String?
+    ): Flow<List<Exercise>>
 }

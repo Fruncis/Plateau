@@ -1,18 +1,18 @@
 plugins {
     id("com.android.application")
-    id("org.jetbrains.kotlin.android")
-    id("com.google.dagger.hilt.android")
-    id("com.google.devtools.ksp")
+    id("com.android.legacy-kapt")
+    id("org.jetbrains.kotlin.plugin.compose") version "2.0.21"
+    id("com.google.dagger.hilt.android") version "2.55"
 }
 
 android {
     namespace = "com.plateau.app"
-    compileSdk = 35
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.plateau.app"
         minSdk = 28
-        targetSdk = 35
+        targetSdk = 37
         versionCode = 1
         versionName = "1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -26,11 +26,7 @@ android {
         viewBinding = true
     }
 
-    composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.14"
-    }
-
-    packagingOptions {
+    packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1,LICENSE,NOTICE}"
         }
@@ -47,37 +43,45 @@ android {
     }
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
+        sourceCompatibility = JavaVersion.VERSION_21
+        targetCompatibility = JavaVersion.VERSION_21
     }
 
-    kotlinOptions {
-        jvmTarget = "17"
-        freeCompilerArgs += listOf("-Xjvm-default=all", "-P", "plugin:kotlinx-serialization=transparent")
+    kotlin {
+        compilerOptions {
+            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
+        }
+    }
+
+    composeOptions {
     }
 
     namespace = "com.plateau.app"
+
+    kapt {
+        correctErrorTypes = true
+        arguments {
+            arg("hilt.disableInstallInCheck", "true")
+        }
+        includeCompileClasspath = true
+    }
 }
 
 dependencies {
     // Core Android
     val core_ktx_version = "1.15.0"
-    val lifecycle_version = "2.8.2"
+    val lifecycle_version = "2.8.7"
     val room_version = "2.6.1"
-    val hilt_version = "2.51.1"
-    val datastore_version = "1.1.1"
-    val workmanager_version = "2.9.0"
-    val camerax_version = "1.3.4"
-    val mlkit_version = "17.3.0"
-    val compose_bom_version = "2024.09.00"
+    val datastore_version = "1.1.5"
+    val workmanager_version = "2.9.1"
+    val camerax_version = "1.4.1"
+    val compose_bom_version = "2024.10.00"
     val material3_version = "1.3.1"
-    val material3_adaptive_version = "1.0.0-beta01"
-    val serialization_version = "1.7.1"
-    val kotlinx_datetime_version = "0.6.1"
+    val serialization_version = "1.7.3"
+    val kotlinx_datetime_version = "0.6.2"
     val okhttp_version = "4.12.0"
     val retrofit_version = "2.11.0"
-    val coil_version = "2.6.0"
-    val accompanist_version = "0.32.0"
+    val coil_version = "2.7.0"
 
     // Core
     implementation("androidx.core:core-ktx:$core_ktx_version")
@@ -85,7 +89,7 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:$lifecycle_version")
     implementation("androidx.lifecycle:lifecycle-livedata-ktx:$lifecycle_version")
     implementation("androidx.activity:activity-compose:1.9.3")
-    implementation("androidx.navigation:navigation-compose:2.8.3")
+    implementation("androidx.navigation:navigation-compose:2.8.4")
 
     // Compose BOM
     implementation(platform("androidx.compose:compose-bom:$compose_bom_version"))
@@ -93,24 +97,25 @@ dependencies {
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3:$material3_version")
-    implementation("androidx.compose.material3:material3-adaptive:$material3_adaptive_version")
     implementation("androidx.compose.material:material-icons-extended")
 
     // Room Database
     implementation("androidx.room:room-runtime:$room_version")
     implementation("androidx.room:room-ktx:$room_version")
-    ksp("androidx.room:room-compiler:$room_version")
+    kapt("androidx.room:room-compiler:$room_version")
     implementation("androidx.room:room-paging:$room_version")
 
     // Hilt DI
+    val hilt_version = "2.55"
     implementation("com.google.dagger:hilt-android:$hilt_version")
-    ksp("com.google.dagger:hilt-compiler:$hilt_version")
-    implementation("androidx.hilt:hilt-navigation-compose:1.2.0")
-    implementation("androidx.hilt:hilt-work:1.2.0")
+    // Hilt Gradle plugin adds hilt-compiler automatically
+    implementation("androidx.hilt:hilt-navigation-compose:1.1.0")
+    implementation("androidx.hilt:hilt-work:1.1.0")
 
     // DataStore
     implementation("androidx.datastore:datastore-preferences:$datastore_version")
     implementation("androidx.datastore:datastore-preferences-rxjava3:$datastore_version")
+    kapt("androidx.datastore:datastore-preferences:$datastore_version")
 
     // WorkManager
     implementation("androidx.work:work-runtime-ktx:$workmanager_version")
@@ -121,11 +126,8 @@ dependencies {
     implementation("androidx.camera:camera-lifecycle:$camerax_version")
     implementation("androidx.camera:camera-view:$camerax_version")
     implementation("androidx.camera:camera-video:$camerax_version")
-    implementation("androidx.camera:camera-mlkit-vision:$camerax_version")
 
     // ML Kit (Pose Detection & Segmentation)
-    implementation("com.google.mlkit:pose-detection:$mlkit_version")
-    implementation("com.google.mlkit:subject-segmentation:$mlkit_version")
 
     // Serialization
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:$serialization_version")
@@ -140,8 +142,6 @@ dependencies {
     implementation("io.coil-kt:coil-compose:$coil_version")
 
     // Accompanist (insets, permissions)
-    implementation("com.google.accompanist:accompanist-insets:$accompanist_version")
-    implementation("com.google.accompanist:accompanist-permissions:$accompanist_version")
 
     // Testing
     testImplementation("junit:junit:4.13.2")
@@ -152,5 +152,4 @@ dependencies {
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
     androidTestImplementation("androidx.compose.ui:ui-test-manifest")
     debugImplementation("androidx.compose.ui:ui-tooling")
-    debugImplementation("androidx.compose.ui:ui-tooling-datainception")
 }

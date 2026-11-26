@@ -12,7 +12,7 @@ interface PlanDayDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(days: List<PlanDay>)
 
-    @Query("SELECT * FROM plan_days WHERE planId = :planId ORDER BY order")
+    @Query("SELECT * FROM plan_days WHERE planId = :planId ORDER BY \"order\"")
     fun getByPlanId(planId: String): Flow<List<PlanDay>>
 
     @Query("SELECT * FROM plan_days WHERE id = :id")

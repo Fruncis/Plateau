@@ -76,7 +76,7 @@ class ImportParserTest {
         assertEquals(1, partial.unmatchedLines.size)
         val unmatched = partial.unmatchedLines[0]
         assertEquals("Unknown exercise 3x10 60kg", unmatched.line)
-        assertTrue(unmatched.suggestions.isNotEmpty())
+        assertTrue(unmatched.suggestions.isEmpty()) // no catalog entry is a close match to this unrelated name
     }
 
     @Test

@@ -226,7 +226,7 @@ private fun PRsList() {
 }
 
 @Composable
-private fun PRCard(exercise: String, bestSet: String, e1rm: String, when: String, isNew: Boolean) {
+private fun PRCard(exercise: String, bestSet: String, e1rm: String, `when`: String, isNew: Boolean) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = if (isNew) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.surfaceVariant,
@@ -251,7 +251,7 @@ private fun PRCard(exercise: String, bestSet: String, e1rm: String, when: String
             }
             Column(horizontalAlignment = Alignment.End) {
                 Text(e1rm, style = NumberLarge, color = MaterialTheme.colorScheme.progressText)
-                Text(when, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(`when`, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }

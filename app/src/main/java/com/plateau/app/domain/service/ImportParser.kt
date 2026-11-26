@@ -1,7 +1,6 @@
 package com.plateau.app.domain.service
 
 import com.plateau.app.data.local.entity.Exercise
-import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 
@@ -70,16 +69,23 @@ object ImportParser {
         val standardMatch = standardFormatRegex.matchEntire(line)
         if (standardMatch != null) {
             val exerciseName = standardMatch.groupValues[1].trim()
-            val sets = standardMatch.groupValues[2].toInt()
-            val reps = standardMatch.groupValues[3].toInt()
-            val weight = standardMatch.groupValues[4].toDouble()
-            val rpe = standardMatch.groupValues[5]?.toIntOrNull()
+            val setCount = standardMatch.groupValues[2].toIntOrNull()
+            val reps = standardMatch.groupValues[3].toIntOrNull()
+            val weight = standardMatch.groupValues[4].toDoubleOrNull()
+            val rpe = standardMatch.groupValues[5].takeIf(String::isNotEmpty)?.toIntOrNull()
+
+            if (setCount == null || setCount <= 0 || reps == null || reps <= 0 ||
+                weight == null || !weight.isFinite() || weight < 0.0 ||
+                (standardMatch.groupValues[5].isNotEmpty() && (rpe == null || rpe !in 1..10))
+            ) {
+                return ParseLineResult.Unmatched(line, emptyList())
+            }
 
             val matchedExercise = findExercise(exerciseName, catalog)
             return if (matchedExercise != null) {
                 ParseLineResult.Success(ParsedWorkout(
                     exerciseName = matchedExercise.name,
-                    sets = List(sets) { ParsedSet(weight = weight, reps = reps, rpe = rpe) }
+                    sets = List(setCount) { ParsedSet(weight = weight, reps = reps, rpe = rpe) }
                 ))
             } else {
                 ParseLineResult.Unmatched(line, findSuggestions(exerciseName, catalog))
@@ -96,10 +102,17 @@ object ImportParser {
             if (dropSetMatches.isNotEmpty()) {
                 val matchedExercise = findExercise(exerciseName, catalog)
                 if (matchedExercise != null) {
-                    val sets = dropSetMatches.map { match ->
-                        val weight = match.groupValues[1].toDouble()
-                        val reps = match.groupValues[2].toInt()
-                        ParsedSet(weight = weight, reps = reps, isDropSet = true)
+                    val sets = dropSetMatches.mapNotNull { match ->
+                        val weight = match.groupValues[1].toDoubleOrNull()
+                        val reps = match.groupValues[2].toIntOrNull()
+                        if (weight == null || !weight.isFinite() || weight < 0.0 || reps == null || reps <= 0) {
+                            null
+                        } else {
+                            ParsedSet(weight = weight, reps = reps, isDropSet = true)
+                        }
+                    }
+                    if (sets.size != dropSetMatches.size || sets.isEmpty()) {
+                        return ParseLineResult.Unmatched(line, emptyList())
                     }
                     return ParseLineResult.Success(ParsedWorkout(
                         exerciseName = matchedExercise.name,
@@ -112,11 +125,11 @@ object ImportParser {
         }
 
         // Try LLM fallback as last resort (stub with 5s timeout)
-        val llmResult = withTimeoutOrNull(5000) {
-            parseWithLLMFallback(line, catalog)
-        }
+        // The LLM fallback is currently a local no-op stub. Apply a timeout
+        // when it becomes a real suspend/network operation.
+        val llmResult = parseWithLLMFallback(line, catalog)
 
-        return llmResult ?: ParseLineResult.Unmatched(line, findSuggestions(line.split(" ").firstOrNull() ?: "", catalog))
+        return llmResult ?: ParseLineResult.Unmatched(line, findSuggestions(line, catalog))
     }
 
     /**

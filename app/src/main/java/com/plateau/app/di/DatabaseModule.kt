@@ -7,12 +7,12 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.android.scopes.Singleton
 import dagger.Module
 import dagger.Provides
-import dagger.hilt.InstallIn
+import dagger.hilt.android.scopes.InstallIn
 import dagger.hilt.android.components.SingletonComponent
 import javax.inject.Inject
 
 @Module
-@InstallIn(SingletonComponent::class)
+@InstallIn(SingletonComponent::class.java)
 object DatabaseModule {
 
     @Provides

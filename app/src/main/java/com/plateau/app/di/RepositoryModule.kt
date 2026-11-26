@@ -10,11 +10,11 @@ import com.plateau.app.domain.usecase.GetActivePlanUseCase
 import dagger.hilt.android.scopes.Singleton
 import dagger.Module
 import dagger.Provides
-import dagger.hilt.InstallIn
+import dagger.hilt.android.scopes.InstallIn
 import dagger.hilt.android.components.SingletonComponent
 
 @Module
-@InstallIn(SingletonComponent::class)
+@InstallIn(SingletonComponent::class.java)
 object RepositoryModule {
 
     @Provides

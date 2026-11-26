@@ -4,6 +4,7 @@ import com.plateau.app.data.local.entity.Exercise
 import com.plateau.app.data.local.entity.SetLog
 import com.plateau.app.data.local.entity.WorkoutSession
 import com.plateau.app.data.repository.ExerciseRepository
+import com.plateau.app.data.repository.SeedRepository
 import com.plateau.app.data.repository.SessionRepository
 import com.plateau.app.domain.service.ImportResult
 import com.plateau.app.domain.service.ParsedSet
@@ -23,18 +24,26 @@ import org.junit.Before
 import org.junit.Test
 import org.mockito.kotlin.any
 import org.mockito.kotlin.doAnswer
+import org.mockito.kotlin.doReturn
 import org.mockito.kotlin.never
 import org.mockito.kotlin.argumentCaptor
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.times
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceUntilIdle
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ImportReviewViewModelTest {
 
     private val sessionRepository: SessionRepository = mock()
     private val exerciseRepository: ExerciseRepository = mock()
+    private val seeded = MutableStateFlow(true)
+    private val seedRepository: SeedRepository = mock { on { seeded } doReturn seeded }
 
     private val bench = Exercise(
         id = "bench", name = "Panca piana", aliases = "[]", primaryMuscleId = "chest",
@@ -51,8 +60,6 @@ class ImportReviewViewModelTest {
         doAnswer { catalog.value = catalog.value + (it.arguments[0] as Exercise); Unit }
             .whenever(exerciseRepository).insertExercise(any())
         whenever(exerciseRepository.getMuscleGroupName(any())).thenReturn("Petto")
-        whenever(sessionRepository.startSession(null))
-            .thenReturn(WorkoutSession(id = "s1", planDayId = null, date = 0L, durationSec = 0))
     }
 
     @After
@@ -60,7 +67,18 @@ class ImportReviewViewModelTest {
         Dispatchers.resetMain()
     }
 
-    private fun viewModel() = ImportReviewViewModel(sessionRepository, exerciseRepository)
+    private fun viewModel(dispatcher: CoroutineDispatcher = Dispatchers.Main) =
+        ImportReviewViewModel(sessionRepository, exerciseRepository, seedRepository, dispatcher)
+
+    /** Session and logs passed to the single atomic importSession call. */
+    private suspend fun importedLogs(): Pair<WorkoutSession, List<SetLog>> {
+        val session = argumentCaptor<WorkoutSession>()
+        val logs = argumentCaptor<List<SetLog>>()
+        verify(sessionRepository, times(1)).importSession(session.capture(), logs.capture())
+        verify(sessionRepository, never()).logSet(any())
+        verify(sessionRepository, never()).startSession(any())
+        return session.firstValue to logs.firstValue
+    }
 
     @Test
     fun `confirm import starts one session and logs one set per parsed set`() = runTest {
@@ -68,7 +86,7 @@ class ImportReviewViewModelTest {
         vm.setImportResult(
             ImportResult.Success(
                 listOf(
-                    ParsedWorkout("Panca piana", listOf(ParsedSet(80.0, 10), ParsedSet(80.0, 8, rpe = 9))),
+                    ParsedWorkout("Panca piana", listOf(ParsedSet(80.0, 10), ParsedSet(80.0, 8, rpe = 9.0))),
                     ParsedWorkout("Squat", listOf(ParsedSet(100.0, 5)))
                 )
             )
@@ -76,12 +94,35 @@ class ImportReviewViewModelTest {
 
         vm.onConfirmImport()
 
-        verify(sessionRepository, times(1)).startSession(null)
-        val captor = argumentCaptor<SetLog>()
-        verify(sessionRepository, times(3)).logSet(captor.capture())
-        assertEquals(listOf("bench", "bench", "squat"), captor.allValues.map { it.exerciseId })
-        assertTrue(captor.allValues.all { it.sessionId == "s1" })
+        val (session, logs) = importedLogs()
+        assertEquals(listOf("bench", "bench", "squat"), logs.map { it.exerciseId })
+        assertTrue(logs.all { it.sessionId == session.id })
+        assertNull(session.planDayId)
+        assertEquals(listOf(null, 9.0, null), logs.map { it.rpe })
         assertTrue(vm.uiState.value.imported)
+    }
+
+    @Test
+    fun `two lines for the same exercise get distinct set indexes`() = runTest {
+        val vm = viewModel()
+        vm.setImportResult(
+            ImportResult.Success(
+                listOf(
+                    ParsedWorkout("Panca piana", List(3) { ParsedSet(80.0, 10) }),
+                    ParsedWorkout("Squat", listOf(ParsedSet(100.0, 5))),
+                    ParsedWorkout("Panca piana", List(3) { ParsedSet(85.0, 8) })
+                )
+            )
+        )
+
+        vm.onConfirmImport()
+
+        val (_, logs) = importedLogs()
+        assertEquals(7, logs.size)
+        val bench = logs.filter { it.exerciseId == "bench" }
+        assertEquals(listOf(0, 1, 2, 3, 4, 5), bench.map { it.setIndex })
+        assertEquals(listOf(80.0, 80.0, 80.0, 85.0, 85.0, 85.0), bench.map { it.weight })
+        assertEquals(listOf(0), logs.filter { it.exerciseId == "squat" }.map { it.setIndex })
     }
 
     @Test
@@ -185,5 +226,103 @@ class ImportReviewViewModelTest {
         vm.parseImportText("Panca piana 3x10 80kg\nIgnoto 3x10 40kg")
 
         assertTrue(vm.uiState.value.unmatched.isEmpty())
+    }
+
+    @Test
+    fun `failed atomic import shows error and can be retried`() = runTest {
+        val vm = viewModel()
+        vm.setImportResult(ImportResult.Success(listOf(ParsedWorkout("Panca piana", listOf(ParsedSet(80.0, 10))))))
+        whenever(sessionRepository.importSession(any(), any())).thenThrow(IllegalStateException("disk full"))
+
+        vm.onConfirmImport()
+
+        assertEquals("disk full", vm.uiState.value.error)
+        assertFalse(vm.uiState.value.imported)
+        assertFalse(vm.uiState.value.isImporting)
+    }
+
+    @Test
+    fun `workout not in catalog fails before anything is written`() = runTest {
+        val vm = viewModel()
+        vm.setImportResult(
+            ImportResult.Success(
+                listOf(ParsedWorkout("Panca piana", listOf(ParsedSet(80.0, 10))), ParsedWorkout("Fantasma", listOf(ParsedSet(10.0, 10))))
+            )
+        )
+
+        vm.onConfirmImport()
+
+        verify(sessionRepository, never()).importSession(any(), any())
+        assertTrue(vm.uiState.value.error!!.contains("Fantasma"))
+    }
+
+    @Test
+    fun `tapping a suggestion resolves the line to that existing exercise`() = runTest {
+        val vm = viewModel()
+        vm.parseImportText("Squat 4x8 100kg\nPnca piana 3x8 85 kg")
+        val unmatched = vm.uiState.value.unmatched.single()
+        assertTrue(unmatched.suggestions.contains("Panca piana"))
+
+        vm.onUseSuggestion(0, "Panca piana")
+
+        verify(exerciseRepository, never()).insertExercise(any())
+        val state = vm.uiState.value
+        assertTrue(state.unmatched.isEmpty())
+        assertEquals(listOf("Squat", "Panca piana"), state.editedWorkouts.map { it.exerciseName })
+        assertEquals(List(3) { 85.0 }, state.editedWorkouts[1].sets.map { it.weight })
+        assertNull(state.error)
+    }
+
+    @Test
+    fun `a suggestion that is not in the catalog never inserts an exercise`() = runTest {
+        val vm = viewModel()
+        vm.setImportResult(ImportResult.Partial(emptyList(), listOf(ImportResult.UnmatchedLine("Xyz 3x10 50kg", listOf("Sparito")))))
+
+        vm.onUseSuggestion(0, "Sparito")
+
+        verify(exerciseRepository, never()).insertExercise(any())
+        assertEquals(1, vm.uiState.value.unmatched.size)
+        assertNotNull(vm.uiState.value.error)
+    }
+
+    @Test
+    fun `edit with invalid sets is rejected`() = runTest {
+        val vm = viewModel()
+        vm.setImportResult(ImportResult.Success(listOf(ParsedWorkout("Panca piana", listOf(ParsedSet(80.0, 10))))))
+
+        vm.onEditWorkout(0, ParsedWorkout("Panca piana", listOf(ParsedSet(80.0, 0))))
+        vm.onEditWorkout(0, ParsedWorkout("Panca piana", listOf(ParsedSet(-5.0, 8))))
+        vm.onEditWorkout(0, ParsedWorkout("Panca piana", listOf(ParsedSet(Double.NaN, 8))))
+        vm.onEditWorkout(0, ParsedWorkout("Panca piana", emptyList()))
+        assertEquals(ParsedSet(80.0, 10), vm.uiState.value.editedWorkouts[0].sets.single())
+
+        vm.onEditWorkout(0, ParsedWorkout("Panca piana", listOf(ParsedSet(0.0, 12))))
+        assertEquals(ParsedSet(0.0, 12), vm.uiState.value.editedWorkouts[0].sets.single())
+    }
+
+    @Test
+    fun `parsing waits for the catalog seed on a cold start`() = runTest {
+        seeded.value = false
+        val vm = viewModel()
+
+        vm.parseImportText("Panca piana 3x10 80kg")
+        assertTrue(vm.uiState.value.isImporting)
+        assertTrue(vm.uiState.value.editedWorkouts.isEmpty())
+
+        seeded.value = true
+        assertFalse(vm.uiState.value.isImporting)
+        assertEquals(listOf("Panca piana"), vm.uiState.value.editedWorkouts.map { it.exerciseName })
+    }
+
+    @Test
+    fun `parsing runs on the parse dispatcher`() = runTest {
+        val parse = StandardTestDispatcher(testScheduler)
+        val vm = viewModel(parse)
+
+        vm.parseImportText("Panca piana 3x10 80kg")
+        assertTrue(vm.uiState.value.editedWorkouts.isEmpty()) // parse is queued on the other dispatcher
+
+        advanceUntilIdle()
+        assertEquals(listOf("Panca piana"), vm.uiState.value.editedWorkouts.map { it.exerciseName })
     }
 }

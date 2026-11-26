@@ -5,25 +5,41 @@ import androidx.lifecycle.viewModelScope
 import com.plateau.app.data.local.entity.Exercise
 import com.plateau.app.data.local.entity.MuscleGroup
 import com.plateau.app.data.local.entity.SetLog
+import com.plateau.app.data.local.entity.WorkoutSession
 import com.plateau.app.data.repository.ExerciseRepository
+import com.plateau.app.data.repository.SeedRepository
 import com.plateau.app.data.repository.SessionRepository
 import com.plateau.app.domain.service.ImportParser
 import com.plateau.app.domain.service.ImportResult
+import com.plateau.app.domain.service.ParsedSet
 import com.plateau.app.domain.service.ParsedWorkout
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.util.UUID
 import javax.inject.Inject
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @HiltViewModel
-class ImportReviewViewModel @Inject constructor(
+class ImportReviewViewModel internal constructor(
     private val sessionRepository: SessionRepository,
-    private val exerciseRepository: ExerciseRepository
+    private val exerciseRepository: ExerciseRepository,
+    private val seedRepository: SeedRepository,
+    private val parseDispatcher: CoroutineDispatcher
 ) : ViewModel() {
+
+    @Inject
+    constructor(
+        sessionRepository: SessionRepository,
+        exerciseRepository: ExerciseRepository,
+        seedRepository: SeedRepository
+    ) : this(sessionRepository, exerciseRepository, seedRepository, Dispatchers.Default)
+
     private val _uiState = MutableStateFlow(ImportReviewUiState())
     val uiState: StateFlow<ImportReviewUiState> = _uiState.asStateFlow()
 
@@ -46,8 +62,10 @@ class ImportReviewViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isImporting = true, error = null)
             runCatching {
+                // Cold start from a share: the catalog may still be seeding.
+                seedRepository.seeded.first { it }
                 val catalog = exerciseRepository.getAllExercises().first()
-                val result = ImportParser.parse(input, catalog)
+                val result = withContext(parseDispatcher) { ImportParser.parse(input, catalog) }
                 val exercisesByName = catalog.associateBy { it.name.trim().lowercase() }
                 val muscleNames = result.workoutsOrEmpty().mapNotNull { workout ->
                     val exercise = exercisesByName[workout.exerciseName.trim().lowercase()] ?: return@mapNotNull null
@@ -75,7 +93,14 @@ class ImportReviewViewModel @Inject constructor(
     /** Exercise text of an unmatched line: everything before the set notation. */
     fun exerciseTextOf(line: String): String = ImportParser.splitLine(line).exerciseName
 
-    fun onAddAsNew(index: Int, name: String, muscleId: String) {
+    /** Adds an unmatched line as a new exercise, or reuses an existing exercise with the same name. */
+    fun onAddAsNew(index: Int, name: String, muscleId: String) = addLine(index, name, muscleId)
+
+    /** Resolves an unmatched line to one of its suggested (existing) exercises. */
+    fun onUseSuggestion(index: Int, exerciseName: String) = addLine(index, exerciseName, muscleId = null)
+
+    /** [muscleId] null: the exercise must already exist in the catalog (nothing is inserted). */
+    private fun addLine(index: Int, name: String, muscleId: String?) {
         val unmatched = _uiState.value.unmatched.getOrNull(index) ?: return
         val cleanName = name.trim()
         if (cleanName.isEmpty()) return
@@ -83,11 +108,12 @@ class ImportReviewViewModel @Inject constructor(
             runCatching {
                 val catalog = exerciseRepository.getAllExercises().first()
                 val existing = catalog.firstOrNull { it.name.trim().equals(cleanName, ignoreCase = true) }
+                if (existing == null && muscleId == null) error("Esercizio non trovato nel catalogo: $cleanName")
                 val candidate = existing ?: Exercise(
                     id = UUID.randomUUID().toString(),
                     name = cleanName,
                     aliases = "[]",
-                    primaryMuscleId = muscleId,
+                    primaryMuscleId = muscleId!!,
                     secondaryMuscleId = null,
                     movementPattern = "push",
                     equipment = "bodyweight",
@@ -123,9 +149,11 @@ class ImportReviewViewModel @Inject constructor(
         }
     }
 
+    /** Replaces the workout at [index]; ignored when any set is invalid (see [isValidSet]). */
     fun onEditWorkout(index: Int, workout: ParsedWorkout) {
         val updated = _uiState.value.editedWorkouts.toMutableList()
         if (index !in updated.indices) return
+        if (workout.sets.isEmpty() || !workout.sets.all(::isValidSet)) return
         updated[index] = workout
         _uiState.value = _uiState.value.copy(editedWorkouts = updated)
     }
@@ -142,27 +170,13 @@ class ImportReviewViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isImporting = true, error = null)
             runCatching {
-                val catalogByName = exerciseRepository.getAllExercises().first()
-                    .associateBy { it.name.trim().lowercase() }
-                val session = sessionRepository.startSession(planDayId = null)
-                _uiState.value.editedWorkouts.forEach { workout ->
-                    val exercise = catalogByName[workout.exerciseName.trim().lowercase()]
-                        ?: error("Esercizio non trovato nel catalogo: ${workout.exerciseName}")
-                    workout.sets.forEachIndexed { setIndex, set ->
-                        sessionRepository.logSet(
-                            SetLog(
-                                id = UUID.randomUUID().toString(),
-                                sessionId = session.id,
-                                exerciseId = exercise.id,
-                                setIndex = setIndex,
-                                reps = set.reps,
-                                weight = set.weight,
-                                rpe = set.rpe?.toDouble(),
-                                completedAt = System.currentTimeMillis()
-                            )
-                        )
-                    }
-                }
+                val catalog = exerciseRepository.getAllExercises().first()
+                val now = System.currentTimeMillis()
+                val session = WorkoutSession(
+                    id = UUID.randomUUID().toString(), planDayId = null, date = now, durationSec = 0
+                )
+                val logs = buildImportLogs(_uiState.value.editedWorkouts, catalog, session.id, now)
+                sessionRepository.importSession(session, logs)
             }.onSuccess {
                 _uiState.value = _uiState.value.copy(isImporting = false, imported = true)
             }.onFailure { throwable ->
@@ -171,6 +185,42 @@ class ImportReviewViewModel @Inject constructor(
                     error = throwable.message ?: "Importazione non riuscita"
                 )
             }
+        }
+    }
+}
+
+/** Reps at least 1, weight a finite number of at least 0 kg (0 = bodyweight). */
+internal fun isValidSet(set: ParsedSet): Boolean = set.reps >= 1 && set.weight.isFinite() && set.weight >= 0.0
+
+/**
+ * One [SetLog] per parsed set. The set index runs per exercise across the whole import, so two lines
+ * for the same exercise ("Panca piana 3x10 80kg" + "Panca piana 3x8 85kg") never collide on the
+ * unique (sessionId, exerciseId, setIndex) index. Throws when an exercise is not in [catalog].
+ */
+internal fun buildImportLogs(
+    workouts: List<ParsedWorkout>,
+    catalog: List<Exercise>,
+    sessionId: String,
+    completedAt: Long
+): List<SetLog> {
+    val catalogByName = catalog.associateBy { it.name.trim().lowercase() }
+    val nextIndex = mutableMapOf<String, Int>()
+    return workouts.flatMap { workout ->
+        val exercise = catalogByName[workout.exerciseName.trim().lowercase()]
+            ?: error("Esercizio non trovato nel catalogo: ${workout.exerciseName}")
+        workout.sets.map { set ->
+            val setIndex = nextIndex.getOrDefault(exercise.id, 0)
+            nextIndex[exercise.id] = setIndex + 1
+            SetLog(
+                id = UUID.randomUUID().toString(),
+                sessionId = sessionId,
+                exerciseId = exercise.id,
+                setIndex = setIndex,
+                reps = set.reps,
+                weight = set.weight,
+                rpe = set.rpe,
+                completedAt = completedAt
+            )
         }
     }
 }

@@ -18,6 +18,15 @@ object Size {
     val minTouch = 44.dp
     val buttonHeight = 56.dp
     val tabBarHeight = 84.dp
+    // Grafici di Progressi
+    val ringSize = 120.dp          // anello di completamento
+    val ringStroke = 12.dp         // spessore dell'anello
+    val chartHeight = 200.dp       // grafico e1RM
+    val chartHeightCompact = 160.dp // grafico volume
+    val chartLine = 2.dp           // linea dati e linea target
+    val chartPoint = 4.dp          // raggio dei punti
+    val chartGrid = 1.dp           // linee della griglia
+    val chartDash = 6.dp           // trattino della linea target
 }
 
 val PlateauShapes = Shapes(

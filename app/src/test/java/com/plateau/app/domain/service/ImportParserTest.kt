@@ -129,9 +129,7 @@ class ImportParserTest {
         val input = ""
         val result = ImportParser.parse(input, catalog)
 
-        assertTrue(result is ImportResult.Success)
-        val success = result as ImportResult.Success
-        assertTrue(success.workouts.isEmpty())
+        assertTrue(result is ImportResult.Failure)
     }
 
     @Test
@@ -139,9 +137,7 @@ class ImportParserTest {
         val input = "   \n\t  \n"
         val result = ImportParser.parse(input, catalog)
 
-        assertTrue(result is ImportResult.Success)
-        val success = result as ImportResult.Success
-        assertTrue(success.workouts.isEmpty())
+        assertTrue(result is ImportResult.Failure)
     }
 
     @Test
@@ -185,5 +181,16 @@ class ImportParserTest {
             assertTrue("Input: $input -> $result", result is ImportResult.Partial)
             assertEquals(1, (result as ImportResult.Partial).unmatchedLines.size)
         }
+    }
+
+    @Test
+    fun `single unmatched line returns Partial with no workouts and keeps suggestions`() {
+        val result = ImportParser.parse("Pnca piana 3x10 80kg", catalog)
+
+        assertTrue("Got $result", result is ImportResult.Partial)
+        val partial = result as ImportResult.Partial
+        assertEquals(0, partial.workouts.size)
+        assertEquals(1, partial.unmatchedLines.size)
+        assertTrue(partial.unmatchedLines[0].suggestions.contains("Panca piana"))
     }
 }

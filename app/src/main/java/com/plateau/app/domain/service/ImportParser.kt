@@ -35,7 +35,7 @@ object ImportParser {
             .filter { it.isNotEmpty() }
 
         if (lines.isEmpty()) {
-            return ImportResult.Success(emptyList())
+            return ImportResult.Failure("Input is empty")
         }
 
         val workouts = mutableListOf<ParsedWorkout>()
@@ -51,8 +51,6 @@ object ImportParser {
 
         return if (unmatchedLines.isEmpty()) {
             ImportResult.Success(workouts)
-        } else if (workouts.isEmpty()) {
-            ImportResult.Failure("No valid exercises found in input")
         } else {
             ImportResult.Partial(workouts, unmatchedLines)
         }

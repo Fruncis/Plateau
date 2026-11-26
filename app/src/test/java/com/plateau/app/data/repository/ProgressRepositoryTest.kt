@@ -164,4 +164,106 @@ class ProgressRepositoryTest {
 
         assertEquals(listOf("bench"), repo.getRecentPRs(now = now).first().map { it.exerciseId })
     }
+
+    // --- double progression ---
+
+    private val benchTarget = ProgressionTarget("bench", "Panca", sets = 3, repsMin = 6, repsMax = 10)
+
+    private fun session(id: String, at: Long, vararg sets: Pair<Double, Int>) =
+        sets.mapIndexed { i, (w, r) -> SetLog("${id}_$i", id, "bench", i, r, w, null, at + i) }
+
+    @Test
+    fun `all planned sets at repsMax at the same weight suggests plus 2_5 kg and repsMin`() {
+        val now = millis(2026, 11, 26, 18)
+        val logs = session("s1", now, 80.0 to 10, 80.0 to 10, 80.0 to 11)
+
+        val s = doubleProgressionSuggestions(listOf(benchTarget), logs, rome).single()
+
+        assertEquals(80.0, s.currentWeight, 0.0)
+        assertEquals(10, s.currentReps)
+        assertEquals(82.5, s.suggestedWeight, 0.0)
+        assertEquals(6, s.targetReps)
+        assertEquals(1, s.weeksAtTop)
+    }
+
+    @Test
+    fun `not at top keeps the weight and adds one rep up to repsMax`() {
+        val now = millis(2026, 11, 26, 18)
+        val logs = session("s1", now, 80.0 to 10, 80.0 to 9, 80.0 to 8)
+
+        val s = doubleProgressionSuggestions(listOf(benchTarget), logs, rome).single()
+
+        assertEquals(80.0, s.suggestedWeight, 0.0)
+        assertEquals(8, s.currentReps)
+        assertEquals(9, s.targetReps)
+        assertEquals(0, s.weeksAtTop)
+
+        val nearTop = session("s2", now, 80.0 to 10, 80.0 to 10)
+        val capped = doubleProgressionSuggestions(listOf(benchTarget), nearTop, rome).single() // only 2 of 3 sets
+        assertEquals(80.0, capped.suggestedWeight, 0.0)
+        assertEquals(10, capped.targetReps) // min(10 + 1, repsMax)
+        assertEquals(0, capped.weeksAtTop)
+    }
+
+    @Test
+    fun `mixed weights are not at top and use the heaviest weight`() {
+        val now = millis(2026, 11, 26, 18)
+        val logs = session("s1", now, 80.0 to 10, 85.0 to 10, 80.0 to 10)
+
+        val s = doubleProgressionSuggestions(listOf(benchTarget), logs, rome).single()
+
+        assertEquals(85.0, s.currentWeight, 0.0)
+        assertEquals(85.0, s.suggestedWeight, 0.0)
+        assertEquals(10, s.targetReps)
+        assertEquals(0, s.weeksAtTop)
+    }
+
+    @Test
+    fun `only the most recent session counts`() {
+        val older = session("old", millis(2026, 11, 24, 18), 80.0 to 10, 80.0 to 10, 80.0 to 10)
+        val latest = session("new", millis(2026, 11, 26, 18), 82.5 to 7, 82.5 to 6, 82.5 to 6)
+
+        val s = doubleProgressionSuggestions(listOf(benchTarget), older + latest, rome).single()
+
+        assertEquals(82.5, s.suggestedWeight, 0.0)
+        assertEquals(7, s.targetReps)
+        assertEquals(0, s.weeksAtTop)
+    }
+
+    @Test
+    fun `weeksAtTop counts consecutive recent weeks at top and stops at a gap or a miss`() {
+        val top = arrayOf(80.0 to 10, 80.0 to 10, 80.0 to 10)
+        val thisWeek = session("w0", millis(2026, 11, 26, 18), *top)
+        val lastWeek = session("w1", millis(2026, 11, 19, 18), *top)
+        val twoWeeksAgo = session("w2", millis(2026, 11, 12, 18), *top)
+        val threeWeeksAgoMiss = session("w3", millis(2026, 11, 5, 18), 80.0 to 8, 80.0 to 8, 80.0 to 8)
+        assertEquals(3, doubleProgressionSuggestions(listOf(benchTarget), thisWeek + lastWeek + twoWeeksAgo + threeWeeksAgoMiss, rome).single().weeksAtTop)
+
+        // A week without sessions breaks the streak.
+        assertEquals(1, doubleProgressionSuggestions(listOf(benchTarget), thisWeek + twoWeeksAgo, rome).single().weeksAtTop)
+
+        // Within a week only the latest session counts.
+        val earlierThisWeekMiss = session("w0a", millis(2026, 11, 23, 18), 80.0 to 8, 80.0 to 8, 80.0 to 8)
+        assertEquals(2, doubleProgressionSuggestions(listOf(benchTarget), thisWeek + earlierThisWeekMiss + lastWeek, rome).single().weeksAtTop)
+    }
+
+    @Test
+    fun `exercises without logs are skipped and duplicates in the plan counted once`() {
+        val logs = session("s1", millis(2026, 11, 26, 18), 80.0 to 10)
+        val squat = ProgressionTarget("squat", "Squat", 3, 5, 8)
+
+        val result = doubleProgressionSuggestions(listOf(benchTarget, squat, benchTarget.copy(sets = 5)), logs, rome)
+
+        assertEquals(listOf("bench"), result.map { it.exerciseId })
+    }
+
+    @Test
+    fun `logged exercises are listed most recent first and unknown ids skipped`() = runTest {
+        whenever(setLogDao.getAllSince(0L)).thenReturn(
+            flowOf(listOf(log("a", "bench", 50.0, 5, 1L), log("b", "squat", 50.0, 5, 3L), log("c", "ghost", 1.0, 1, 4L), log("d", "bench", 50.0, 5, 2L)))
+        )
+        whenever(exerciseDao.getAll()).thenReturn(flowOf(listOf(exercise("bench", "Panca"), exercise("squat", "Squat"))))
+
+        assertEquals(listOf("squat", "bench"), repo.getLoggedExercises().first().map { it.id })
+    }
 }

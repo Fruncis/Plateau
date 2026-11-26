@@ -86,12 +86,25 @@ class ProgressRepository @Inject constructor(
             }.sortedByDescending { it.date }.take(limit)
         }
 
-    /** Ancora un segnaposto: la progressione doppia non e' ancora calcolata. */
-    fun getDoubleProgressionSuggestions(): Flow<List<DoubleProgressionSuggestion>> = exerciseDao.getAll()
-        .map { exercises ->
-            // Simplified - would check recent sets for each exercise
-            emptyList()
+    /** Esercizi con almeno una serie registrata, dal piu' recente (per il selettore senza scheda attiva). */
+    fun getLoggedExercises(): Flow<List<Exercise>> =
+        combine(setLogDao.getAllSince(0L), exerciseDao.getAll()) { logs, exercises ->
+            val byId = exercises.associateBy { it.id }
+            logs.sortedByDescending { it.completedAt }
+                .map { it.exerciseId }
+                .distinct()
+                .mapNotNull { byId[it] }
         }
+
+    /**
+     * Doppia progressione per gli esercizi della scheda attiva ([targets], passati dal chiamante perche'
+     * il repository non conosce la scheda): vedi [doubleProgressionSuggestions].
+     */
+    fun getDoubleProgressionSuggestions(
+        targets: List<ProgressionTarget>,
+        zone: ZoneId = ZoneId.systemDefault()
+    ): Flow<List<DoubleProgressionSuggestion>> =
+        setLogDao.getAllSince(0L).map { logs -> doubleProgressionSuggestions(targets, logs, zone) }
 
     private fun calculateE1RM(weight: Double, reps: Int): Double {
         return weight * (1 + reps / 30.0)
@@ -101,6 +114,79 @@ class ProgressRepository @Inject constructor(
         const val VOLUME_WEEKS = 8
         const val NEW_PR_WINDOW_MS = 7L * 24 * 60 * 60 * 1000
     }
+}
+
+/** Esercizio della scheda attiva con il suo range: [sets] serie da [repsMin]-[repsMax] ripetizioni. */
+data class ProgressionTarget(
+    val exerciseId: String,
+    val exerciseName: String,
+    val sets: Int,
+    val repsMin: Int,
+    val repsMax: Int
+)
+
+/** Incremento di carico quando il range e' chiuso in alto. */
+internal const val PROGRESSION_STEP_KG = 2.5
+
+/**
+ * Doppia progressione. Per ogni [ProgressionTarget] (senza serie registrate: saltato) guarda le serie
+ * della sessione piu' recente:
+ * - in alto: le prime [ProgressionTarget.sets] serie (per setIndex) sono tutte allo stesso peso con
+ *   almeno [ProgressionTarget.repsMax] ripetizioni -> peso + 2,5 kg, obiettivo [ProgressionTarget.repsMin];
+ * - altrimenti: stesso peso (il peso massimo della sessione), obiettivo min(ripetizioni + 1, repsMax),
+ *   dove "ripetizioni" sono le minime fatte a quel peso (la serie da recuperare).
+ * [DoubleProgressionSuggestion.weeksAtTop] conta le settimane consecutive (da lunedi', fuso [zone]),
+ * a partire da quella della sessione piu' recente, la cui ultima sessione era in alto; 0 se non lo e'.
+ */
+internal fun doubleProgressionSuggestions(
+    targets: List<ProgressionTarget>,
+    logs: List<SetLog>,
+    zone: ZoneId
+): List<DoubleProgressionSuggestion> {
+    val logsByExercise = logs.groupBy { it.exerciseId }
+    return targets.distinctBy { it.exerciseId }.mapNotNull { target ->
+        val sessions = logsByExercise[target.exerciseId].orEmpty()
+            .groupBy { it.sessionId }.values
+            .map { sets -> sets.sortedBy { it.setIndex } }
+            .sortedByDescending { sets -> sets.maxOf { it.completedAt } }
+        val last = sessions.firstOrNull() ?: return@mapNotNull null
+        val atTop = isAtTop(last, target)
+        val workingWeight = last.maxOf { it.weight }
+        val lastReps = last.filter { it.weight == workingWeight }.minOf { it.reps }
+        DoubleProgressionSuggestion(
+            exerciseId = target.exerciseId,
+            exerciseName = target.exerciseName,
+            currentWeight = workingWeight,
+            currentReps = lastReps,
+            targetReps = if (atTop) target.repsMin else minOf(lastReps + 1, target.repsMax),
+            suggestedWeight = if (atTop) workingWeight + PROGRESSION_STEP_KG else workingWeight,
+            weeksAtTop = if (atTop) weeksAtTop(sessions, target, zone) else 0
+        )
+    }
+}
+
+private fun isAtTop(sessionSets: List<SetLog>, target: ProgressionTarget): Boolean {
+    if (target.sets <= 0) return false
+    val planned = sessionSets.take(target.sets)
+    return planned.size == target.sets &&
+        planned.all { it.reps >= target.repsMax } &&
+        planned.map { it.weight }.distinct().size == 1
+}
+
+/** [sessions] dalla piu' recente; conta le settimane consecutive la cui ultima sessione e' in alto. */
+private fun weeksAtTop(sessions: List<List<SetLog>>, target: ProgressionTarget, zone: ZoneId): Int {
+    val latestPerWeek = sessions
+        .groupBy { sets -> startOfWeekMillis(sets.maxOf { it.completedAt }, zone = zone) }
+        .mapValues { (_, weekSessions) -> weekSessions.first() } // sessions are most recent first
+        .toSortedMap(compareByDescending { it })
+    var expectedWeek = latestPerWeek.firstKey()
+    var count = 0
+    for ((week, session) in latestPerWeek) {
+        if (week != expectedWeek || !isAtTop(session, target)) break
+        count++
+        expectedWeek = startOfWeekMillis(week, weeksBack = 1, zone = zone)
+    }
+    return count
 }
 
 /** Lunedi' 00:00 (fuso locale) della settimana di [timeMillis], spostato indietro di [weeksBack] settimane. */

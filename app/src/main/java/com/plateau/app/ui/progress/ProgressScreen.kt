@@ -100,10 +100,18 @@ internal fun ProgressContent(
             CompletionRing(ringProgress(state.exerciseCompletionPercent), "Esercizio", percentLabel(state.exerciseCompletionPercent))
             CompletionRing(ringProgress(musclePercent), muscleName ?: "Muscolo", percentLabel(musclePercent))
         }
+        if (!state.hasActivePlan) {
+            Text(
+                "Nessuna scheda attiva: attivane una per vedere il completamento.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
 
         ExerciseSelector(
             options = state.exercises,
             selectedName = state.selectedExerciseName,
+            placeholder = if (state.hasActivePlan) "Nessun esercizio nella scheda" else "Nessuna serie registrata",
             muscleName = muscleName,
             onSelected = onExerciseSelected
         )
@@ -119,6 +127,7 @@ internal fun ProgressContent(
 private fun ExerciseSelector(
     options: List<ProgressExerciseOption>,
     selectedName: String?,
+    placeholder: String,
     muscleName: String?,
     onSelected: (String) -> Unit
 ) {
@@ -141,7 +150,7 @@ private fun ExerciseSelector(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    selectedName ?: "Nessuna scheda attiva",
+                    selectedName ?: placeholder,
                     style = MaterialTheme.typography.titleMedium,
                     color = if (selectedName != null) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
@@ -310,23 +319,30 @@ private fun DoubleProgressionCard(suggestions: List<DoubleProgressionSuggestion>
         CardHeader("Doppia progressione")
         if (suggestions.isNullOrEmpty()) {
             Text(
-                "Nessun suggerimento per ora: aggiungi ripetizioni finché chiudi il range in alto.",
+                "Nessun suggerimento per ora: registra le serie di un esercizio della scheda attiva.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         } else {
             suggestions.forEach { s ->
+                val atTop = s.suggestedWeight > s.currentWeight
                 Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
                     Text(s.exerciseName, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
                     Text(
-                        "${formatKg(s.currentWeight)} kg × ${s.currentReps} (obiettivo ${s.targetReps}) per ${s.weeksAtTop} settimane",
+                        if (atTop) {
+                            val weeks = if (s.weeksAtTop == 1) "1 settimana" else "${s.weeksAtTop} settimane"
+                            "Range chiuso: ${formatKg(s.currentWeight)} kg × ${s.currentReps} da $weeks"
+                        } else {
+                            "Ultima volta: ${formatKg(s.currentWeight)} kg × ${s.currentReps}"
+                        },
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
-                        "Prossima seduta: ${formatKg(s.suggestedWeight)} kg",
+                        if (atTop) "Prossima seduta: ${formatKg(s.suggestedWeight)} kg × ${s.targetReps} (+${formatKg(s.suggestedWeight - s.currentWeight)} kg)"
+                        else "Prossima seduta: ${formatKg(s.suggestedWeight)} kg × ${s.targetReps}",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = PlateauTheme.extras.progressText
+                        color = if (atTop) PlateauTheme.extras.progressText else MaterialTheme.colorScheme.onSurface
                     )
                 }
             }
@@ -367,7 +383,11 @@ private val PreviewState = ProgressUiState(
         PR("ex_panca_piana", "Panca piana", 85.0, 10, 85.0 * (1 + 10 / 30.0), PreviewNow - DAY_MS, isNew = true),
         PR("ex_squat", "Squat", 140.0, 6, 140.0 * (1 + 6 / 30.0), PreviewNow - 9 * DAY_MS, isNew = false)
     ),
-    doubleProgression = emptyList(),
+    doubleProgression = listOf(
+        DoubleProgressionSuggestion("ex_panca_piana", "Panca piana", 80.0, 10, 6, 82.5, 2),
+        DoubleProgressionSuggestion("ex_squat", "Squat", 140.0, 6, 7, 140.0, 0)
+    ),
+    hasActivePlan = true,
     weekCompletionPercent = 60,
     exerciseCompletionPercent = null,
     muscleCompletionMap = mapOf("chest" to 67)

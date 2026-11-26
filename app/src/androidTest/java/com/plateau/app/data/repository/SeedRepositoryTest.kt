@@ -35,7 +35,9 @@ class SeedRepositoryTest {
 
     @Test
     fun seedsEveryMuscleAndExerciseOnEmptyDb() = runBlocking {
+        assertEquals(false, repo.seeded.value)
         repo.seedIfEmpty()
+        assertEquals(true, repo.seeded.value)
         assertEquals(CatalogSeed.muscleGroups.size, muscleCount())
         assertEquals(CatalogSeed.exercises.size, exerciseCount())
     }

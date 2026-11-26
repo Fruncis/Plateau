@@ -1,5 +1,11 @@
 package com.plateau.app.ui.session
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material3.Icon
+import com.plateau.app.ui.theme.PlateauTheme
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -40,8 +46,8 @@ fun SessionScreen(
         ) {
             // Main content
             androidx.compose.foundation.layout.Box(modifier = Modifier
-                .fillMaxSize()
-                .padding(bottom = Size.tabBarHeight + Spacing.xl)
+                .weight(1f)
+                .fillMaxWidth()
             ) {
                 Column(
                     modifier = Modifier
@@ -69,7 +75,7 @@ fun SessionScreen(
                     .fillMaxWidth()
                     .padding(horizontal = Spacing.xl, vertical = Spacing.lg)
                     .height(Size.buttonHeight)
-                    .align(androidx.compose.ui.Alignment.BottomCenter)
+                    .align(Alignment.CenterHorizontally)
             ) {
                 PlateauButton("Completa serie 1", onClick = {}, modifier = Modifier.fillMaxWidth())
             }
@@ -145,7 +151,7 @@ private fun SetRow(setNumber: Int, weight: String, reps: String, isCurrent: Bool
             .padding(vertical = 4.dp),
         color = MaterialTheme.colorScheme.surface,
         shape = MaterialTheme.shapes.small,
-        border = androidx.compose.ui.graphics.BorderStroke(2.dp, borderColor)
+        border = BorderStroke(2.dp, borderColor)
     ) {
         Row(
             modifier = Modifier.fillMaxSize().padding(horizontal = Spacing.lg),
@@ -156,9 +162,11 @@ private fun SetRow(setNumber: Int, weight: String, reps: String, isCurrent: Bool
             Text("$weight kg", style = NumberLarge.copy(color = weightColor))
             Text("×$reps", style = NumberLarge.copy(color = repsColor))
             if (isCompleted) {
-                androidx.compose.material.icons.filled.Check(
+                Icon(
+                    imageVector = Icons.Filled.Check,
+                    contentDescription = "Serie completata",
                     modifier = Modifier.size(24.dp),
-                    tint = MaterialTheme.colorScheme.progress
+                    tint = PlateauTheme.extras.progress
                 )
             }
         }
@@ -182,7 +190,7 @@ private fun E1RMEstimate() {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text("80 kg × 10", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
-                Text("107 kg", style = NumberLarge, color = MaterialTheme.colorScheme.progressText)
+                Text("107 kg", style = NumberLarge, color = PlateauTheme.extras.progressText)
             }
         }
     }

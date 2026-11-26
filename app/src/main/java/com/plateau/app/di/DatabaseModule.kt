@@ -4,15 +4,14 @@ import android.content.Context
 import androidx.room.Room
 import com.plateau.app.data.local.PlateauDatabase
 import dagger.hilt.android.qualifiers.ApplicationContext
-import dagger.hilt.android.scopes.Singleton
+import javax.inject.Singleton
 import dagger.Module
 import dagger.Provides
-import dagger.hilt.android.scopes.InstallIn
-import dagger.hilt.android.components.SingletonComponent
-import javax.inject.Inject
+import dagger.hilt.InstallIn
+import dagger.hilt.components.SingletonComponent
 
 @Module
-@InstallIn(SingletonComponent::class.java)
+@InstallIn(SingletonComponent::class)
 object DatabaseModule {
 
     @Provides

@@ -6,8 +6,9 @@ import com.plateau.app.domain.model.PlanDetail
 import com.plateau.app.domain.usecase.GetActivePlanUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.stateIn
+import com.plateau.app.domain.model.PlanDayWithExercises
 import javax.inject.Inject
 
 @HiltViewModel
@@ -16,14 +17,15 @@ class HomeViewModel @Inject constructor(
 ) : ViewModel() {
 
     val activePlan: StateFlow<PlanDetail?> = getActivePlanUseCase()
-        .map { it }
-        .stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(), null)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
-    val currentWeekday: Int = java.util.Calendar.getInstance().get(java.util.Calendar.DAY_OF_WEEK) - 1 // 0=Sun, 6=Sat
+    // 1=Lun ... 7=Dom, come PlanDay.weekday
+    val currentWeekday: Int =
+        (java.util.Calendar.getInstance().get(java.util.Calendar.DAY_OF_WEEK) + 5) % 7 + 1
 
-    fun getTodaysWorkout(plan: PlanDetail?): PlanDetail.PlanDayWithExercises? {
+    fun getTodaysWorkout(plan: PlanDetail?): PlanDayWithExercises? {
         return plan?.days?.find { day ->
-            day.day.weekday?.let { it == currentWeekday } ?: false
+            day.day.weekday == currentWeekday
         }
     }
 }

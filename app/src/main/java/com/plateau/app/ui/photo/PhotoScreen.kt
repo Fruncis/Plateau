@@ -1,5 +1,9 @@
 package com.plateau.app.ui.photo
 
+import com.plateau.app.ui.theme.NumberLarge
+import com.plateau.app.ui.theme.NumberDisplay
+import com.plateau.app.ui.theme.PlateauTheme
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -37,8 +41,8 @@ fun PhotoScreen(
         ) {
             // Main content
             androidx.compose.foundation.layout.Box(modifier = Modifier
-                .fillMaxSize()
-                .padding(bottom = Size.tabBarHeight + Spacing.xl)
+                .weight(1f)
+                .fillMaxWidth()
             ) {
                 Column(
                     modifier = Modifier
@@ -149,7 +153,7 @@ private fun PhotoComparisonCard() {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text("Crescita stimata", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
-                Text("+2–4% (confidenza media)", style = MaterialTheme.typography.numberLarge, color = MaterialTheme.colorScheme.progressText)
+                Text("+2–4% (confidenza media)", style = NumberLarge, color = PlateauTheme.extras.progressText)
             }
         }
     }
@@ -173,7 +177,7 @@ private fun PhotoPlaceholder(label: String, date: String, isPrevious: Boolean) {
             Text(label, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(date, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             if (isPrevious) {
-                Text("Pose guidata ✓", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.progressText)
+                Text("Pose guidata ✓", style = MaterialTheme.typography.labelSmall, color = PlateauTheme.extras.progressText)
             }
         }
     }
@@ -211,7 +215,7 @@ private fun RegionMetricRow(region: String, change: String, confidence: String, 
     ) {
         Text(region, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
         Row(horizontalArrangement = Arrangement.spacedBy(Spacing.lg), verticalAlignment = Alignment.CenterVertically) {
-            Text(change, style = MaterialTheme.typography.numberLarge, color = if (isPositive) MaterialTheme.colorScheme.progressText else MaterialTheme.colorScheme.onSurface)
+            Text(change, style = NumberLarge, color = if (isPositive) PlateauTheme.extras.progressText else MaterialTheme.colorScheme.onSurface)
             Text(confidence, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
@@ -250,7 +254,7 @@ private fun WeakAreaRow(region: String, growthIssue: String, volumeIssue: String
         ) {
             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm), verticalAlignment = Alignment.CenterVertically) {
                 MuscleChip(region, emphasized = true)
-                Column(crossAxisSize = androidx.compose.ui.layout.LayoutWeight(fill = true)) {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(growthIssue, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
                     Text(volumeIssue, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
@@ -285,15 +289,15 @@ private fun KcalRecommendationCard() {
             ) {
                 Column {
                     Text("BMR", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f))
-                    Text("1.750 kcal", style = MaterialTheme.typography.numberLarge, color = MaterialTheme.colorScheme.onPrimary)
+                    Text("1.750 kcal", style = NumberLarge, color = MaterialTheme.colorScheme.onPrimary)
                 }
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("TDEE", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f))
-                    Text("2.625 kcal", style = MaterialTheme.typography.numberLarge, color = MaterialTheme.colorScheme.onPrimary)
+                    Text("2.625 kcal", style = NumberLarge, color = MaterialTheme.colorScheme.onPrimary)
                 }
                 Column(horizontalAlignment = Alignment.End) {
                     Text("Target (Bulk)", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f))
-                    Text("2.900 kcal", style = MaterialTheme.typography.numberDisplay, color = MaterialTheme.colorScheme.onPrimary)
+                    Text("2.900 kcal", style = NumberDisplay, color = MaterialTheme.colorScheme.onPrimary)
                 }
             }
 

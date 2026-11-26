@@ -6,6 +6,7 @@ import com.plateau.app.data.local.dao.SetLogDao
 import com.plateau.app.data.local.entity.WorkoutSession
 import com.plateau.app.data.local.entity.SetLog
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -31,11 +32,12 @@ class SessionRepository @Inject constructor(
         // Duration would be updated, in reality we'd fetch and update
     }
 
-    fun getSession(sessionId: String): Flow<WorkoutSession?> = sessionDao.getById(sessionId)
+    fun getSession(sessionId: String): Flow<WorkoutSession?> = flow { emit(sessionDao.getById(sessionId)) }
 
     suspend fun logSet(setLog: SetLog) = setLogDao.insertAll(listOf(setLog))
 
     fun getSetsForSession(sessionId: String): Flow<List<SetLog>> = setLogDao.getBySessionId(sessionId)
 
-    suspend fun getLastSetForExercise(exerciseId: String): Pair<Double, Int>? = setLogDao.getLastSet(exerciseId)
+    suspend fun getLastSetForExercise(exerciseId: String): Pair<Double, Int>? =
+        setLogDao.getLastSet(exerciseId)?.let { it.weight to it.reps }
 }

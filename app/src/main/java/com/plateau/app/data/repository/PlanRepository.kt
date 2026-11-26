@@ -15,7 +15,11 @@ import com.plateau.app.domain.model.PlanDetail
 import com.plateau.app.domain.model.PlanDayWithExercises
 import com.plateau.app.domain.model.PlanExerciseWithDetails
 import com.plateau.app.domain.model.SetLogSummary
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
@@ -31,24 +35,20 @@ class PlanRepository @Inject constructor(
     private val exerciseDao: ExerciseDao = database.exerciseDao()
     private val setLogDao: SetLogDao = database.setLogDao()
 
-    fun getActivePlanDetail(): Flow<PlanDetail?> = planDao.getActivePlan().map { plan ->
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun getActivePlanDetail(): Flow<PlanDetail?> = planDao.getActivePlan().mapLatest { plan ->
         plan?.let { buildPlanDetail(it) }
     }.distinctUntilChanged()
 
-    private fun buildPlanDetail(plan: Plan): PlanDetail {
-        val days = planDayDao.getByPlanId(plan.id).map { planDays ->
-            planDays.map { day ->
-                val exercises = planExerciseDao.getByPlanDayId(day.id).map { planExercises ->
-                    planExercises.map { pe ->
-                        val exercise = exerciseDao.getById(pe.exerciseId)!!
-                        val lastSets = setLogDao.getByExerciseId(pe.exerciseId, 3).map { logs ->
-                            logs.map { SetLogSummary(it.weight, it.reps, it.completedAt) }
-                        }
-                        PlanExerciseWithDetails(pe, exercise, lastSets)
-                    }
-                }
-                PlanDayWithExercises(day, exercises)
+    private suspend fun buildPlanDetail(plan: Plan): PlanDetail {
+        val days = planDayDao.getByPlanId(plan.id).first().map { day ->
+            val exercises = planExerciseDao.getByPlanDayId(day.id).first().mapNotNull { pe ->
+                val exercise = exerciseDao.getById(pe.exerciseId) ?: return@mapNotNull null
+                val lastSets = setLogDao.getByExerciseId(pe.exerciseId, 3).first()
+                    .map { SetLogSummary(it.weight, it.reps, it.completedAt) }
+                PlanExerciseWithDetails(pe, exercise, lastSets)
             }
+            PlanDayWithExercises(day, exercises)
         }
         return PlanDetail(plan, days)
     }

@@ -2,22 +2,23 @@ package com.plateau.app.di
 
 import android.content.Context
 import androidx.datastore.core.DataStore
-import androidx.datastore.preferences.Preferences
-import androidx.datastore.preferences.preferencesDataStore
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import androidx.datastore.preferences.preferencesDataStoreFile
 import dagger.hilt.android.qualifiers.ApplicationContext
-import dagger.hilt.android.scopes.Singleton
+import javax.inject.Singleton
 import dagger.Module
 import dagger.Provides
-import dagger.hilt.android.scopes.InstallIn
-import dagger.hilt.android.components.SingletonComponent
+import dagger.hilt.InstallIn
+import dagger.hilt.components.SingletonComponent
 
 @Module
-@InstallIn(SingletonComponent::class.java)
+@InstallIn(SingletonComponent::class)
 object DataStoreModule {
 
     @Provides
     @Singleton
     fun provideDataStore(@ApplicationContext context: Context): DataStore<Preferences> {
-        return context.preferencesDataStore("plateau_prefs")
+        return PreferenceDataStoreFactory.create { context.preferencesDataStoreFile("plateau_prefs") }
     }
 }

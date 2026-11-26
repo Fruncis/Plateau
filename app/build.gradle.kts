@@ -2,7 +2,7 @@ plugins {
     id("com.android.application")
     id("com.android.legacy-kapt")
     id("org.jetbrains.kotlin.plugin.compose") version "2.0.21"
-    id("com.google.dagger.hilt.android") version "2.55"
+    id("com.google.dagger.hilt.android") version "2.60.1"
 }
 
 android {
@@ -71,7 +71,7 @@ dependencies {
     // Core Android
     val core_ktx_version = "1.15.0"
     val lifecycle_version = "2.8.7"
-    val room_version = "2.6.1"
+    val room_version = "2.8.5"
     val datastore_version = "1.1.5"
     val workmanager_version = "2.9.1"
     val camerax_version = "1.4.1"
@@ -87,6 +87,7 @@ dependencies {
     implementation("androidx.core:core-ktx:$core_ktx_version")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:$lifecycle_version")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:$lifecycle_version")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:$lifecycle_version")
     implementation("androidx.lifecycle:lifecycle-livedata-ktx:$lifecycle_version")
     implementation("androidx.activity:activity-compose:1.9.3")
     implementation("androidx.navigation:navigation-compose:2.8.4")
@@ -106,9 +107,9 @@ dependencies {
     implementation("androidx.room:room-paging:$room_version")
 
     // Hilt DI
-    val hilt_version = "2.55"
+    val hilt_version = "2.60.1"
     implementation("com.google.dagger:hilt-android:$hilt_version")
-    // Hilt Gradle plugin adds hilt-compiler automatically
+    kapt("com.google.dagger:hilt-compiler:$hilt_version")
     implementation("androidx.hilt:hilt-navigation-compose:1.1.0")
     implementation("androidx.hilt:hilt-work:1.1.0")
 

@@ -13,14 +13,24 @@ object ImportParser {
     /** JSON instance for parsing aliases from Exercise entity */
     private val json = Json { ignoreUnknownKeys = true }
 
-    /** Regex for standard set format: 3x10, 3×10, 3x 10, 3 x 10 */
-    private val standardSetRegex = """(\d+)\s*[x×]\s*(\d+)""".toRegex()
+    private const val WEIGHT = """(\d+(?:[.,]\d+)?)"""
 
-    /** Regex for standard set with weight: Exercise 3x10 80kg or Exercise 3x10 80kg @8 */
-    private val standardFormatRegex = """^(.+?)\s+(\d+)\s*[x×]\s*(\d+)\s+(\d+(?:\.\d+)?)kg\s*(?:@(\d+(?:\.\d+)?))?$""".toRegex()
+    /**
+     * Standard notation after the exercise text: "3x10 80kg", "3 X 10 82,5 KG", "3x10 80kg @8.5".
+     * Weight accepts "." or "," decimals and an optional space before a case-insensitive "kg".
+     */
+    private val standardNotationRegex =
+        """(\d+)\s*[x×]\s*(\d+)\s+$WEIGHT\s*kg(?:\s*@\s*$WEIGHT)?""".toRegex(RegexOption.IGNORE_CASE)
 
-    /** Regex for drop set format: 80kgx10, 70kgx10, 60kgx10 */
-    private val dropSetRegex = """(\d+(?:\.\d+)?)kgx(\d+)""".toRegex()
+    /** One weight-first set: "80kgx10", "80 kg x 10", "72,5KG X 8". */
+    private val weightFirstSetRegex = """$WEIGHT\s*kg\s*[x×]\s*(\d+)""".toRegex(RegexOption.IGNORE_CASE)
+
+    /** A whole comma-separated list of weight-first sets (a decimal comma stays inside its weight). */
+    private val weightFirstListRegex = weightFirstSetRegex.pattern.let { set ->
+        """$set(?:\s*,\s*$set)*""".toRegex(RegexOption.IGNORE_CASE)
+    }
+
+    private val whitespaceRegex = """\s+""".toRegex()
 
     /**
      * Parses workout import text into structured data.
@@ -58,81 +68,71 @@ object ImportParser {
 
     /** Where the set notation starts in a line: "3x10", "3 x 10" or "80kg x 5" after the exercise text. */
     private val notationStartRegex =
-        """\s+(?:\d+\s*[x\u00d7]\s*\d+|\d+(?:\.\d+)?\s*kg\s*[x\u00d7]\s*\d+)""".toRegex(RegexOption.IGNORE_CASE)
+        """\s+(?:\d+\s*[x\u00d7]\s*\d+|\d+(?:[.,]\d+)?\s*kg\s*[x\u00d7]\s*\d+)""".toRegex(RegexOption.IGNORE_CASE)
 
     /**
      * Splits a line into the exercise text and the set notation that follows it.
-     * [SplitLine.notation] keeps its leading whitespace, so `exerciseName + notation` rebuilds the line.
+     * [SplitLine.notation] keeps its leading whitespace, so `exerciseName + notation` rebuilds the line
+     * (internal whitespace in the exercise text is collapsed to single spaces).
      * A line without recognisable notation yields an empty notation.
      */
     fun splitLine(line: String): SplitLine {
         val trimmed = line.trim()
         val start = notationStartRegex.find(trimmed)?.range?.first ?: trimmed.length
-        return SplitLine(trimmed.substring(0, start).trim(), trimmed.substring(start))
+        val name = trimmed.substring(0, start).trim().replace(whitespaceRegex, " ")
+        return SplitLine(name, trimmed.substring(start))
     }
 
     /**
-     * Parses a single line of input.
+     * Parses a single line of input. Any line that is not fully understood is unmatched (needs review),
+     * with suggestions computed on the exercise text only (see [splitLine]).
      */
     private fun parseLine(line: String, catalog: List<Exercise>): ParseLineResult {
-        // Try standard format first: Exercise 3x10 80kg @8
-        val standardMatch = standardFormatRegex.matchEntire(line)
-        if (standardMatch != null) {
-            val exerciseName = standardMatch.groupValues[1].trim()
-            val setCount = standardMatch.groupValues[2].toIntOrNull()
-            val reps = standardMatch.groupValues[3].toIntOrNull()
-            val weight = standardMatch.groupValues[4].toDoubleOrNull()
-            val rpe = standardMatch.groupValues[5].takeIf(String::isNotEmpty)?.toIntOrNull()
-
-            if (setCount == null || setCount <= 0 || reps == null || reps <= 0 ||
-                weight == null || !weight.isFinite() || weight < 0.0 ||
-                (standardMatch.groupValues[5].isNotEmpty() && (rpe == null || rpe !in 1..10))
-            ) {
-                return ParseLineResult.Unmatched(line, emptyList())
-            }
-
-            val matchedExercise = findExercise(exerciseName, catalog)
-            return if (matchedExercise != null) {
-                ParseLineResult.Success(ParsedWorkout(
-                    exerciseName = matchedExercise.name,
-                    sets = List(setCount) { ParsedSet(weight = weight, reps = reps, rpe = rpe) }
-                ))
-            } else {
-                ParseLineResult.Unmatched(line, findSuggestions(exerciseName, catalog))
-            }
+        val split = splitLine(line)
+        val exerciseName = split.exerciseName
+        val notation = split.notation.trim()
+        fun unmatched() = ParseLineResult.Unmatched(line, findSuggestions(exerciseName, catalog))
+        if (exerciseName.isEmpty() || notation.isEmpty()) {
+            return parseWithLLMFallback(line, catalog) ?: unmatched()
         }
 
-        // Try drop set format: Exercise 80kgx10, 70kgx10, 60kgx10
-        val firstDrop = dropSetRegex.find(line)
-        if (firstDrop != null && firstDrop.range.first > 0) {
-            val exerciseName = line.substring(0, firstDrop.range.first).trim()
-            val dropSetMatches = dropSetRegex.findAll(line.substring(firstDrop.range.first)).toList()
-            if (exerciseName.isNotEmpty()) {
-                val matchedExercise = findExercise(exerciseName, catalog)
-                    ?: return ParseLineResult.Unmatched(line, findSuggestions(exerciseName, catalog))
-                val sets = dropSetMatches.mapNotNull { match ->
-                    val weight = match.groupValues[1].toDoubleOrNull()
-                    val reps = match.groupValues[2].toIntOrNull()
-                    if (weight == null || !weight.isFinite() || weight < 0.0 || reps == null || reps <= 0) {
-                        null
-                    } else {
-                        ParsedSet(weight = weight, reps = reps, isDropSet = true)
-                    }
-                }
-                if (sets.size != dropSetMatches.size || sets.isEmpty()) {
-                    return ParseLineResult.Unmatched(line, emptyList())
-                }
-                return ParseLineResult.Success(ParsedWorkout(exerciseName = matchedExercise.name, sets = sets))
-            }
-        }
+        val sets = standardNotationRegex.matchEntire(notation)?.let(::standardSets)
+            ?: weightFirstSets(notation)
+            ?: return unmatched()
 
-        // Try LLM fallback as last resort (stub with 5s timeout)
-        // The LLM fallback is currently a local no-op stub. Apply a timeout
-        // when it becomes a real suspend/network operation.
-        val llmResult = parseWithLLMFallback(line, catalog)
-
-        return llmResult ?: ParseLineResult.Unmatched(line, findSuggestions(line, catalog))
+        val matchedExercise = findExercise(exerciseName, catalog) ?: return unmatched()
+        return ParseLineResult.Success(ParsedWorkout(exerciseName = matchedExercise.name, sets = sets))
     }
+
+    /** Sets for "3x10 80kg @8"; null when a value is out of range (rpe must be 1..10). */
+    private fun standardSets(match: MatchResult): List<ParsedSet>? {
+        val (setsText, repsText, weightText, rpeText) = match.destructured
+        val setCount = setsText.toIntOrNull()
+        val reps = repsText.toIntOrNull()
+        val weight = weightText.toDecimal()
+        val rpe = rpeText.takeIf(String::isNotEmpty)?.let { it.toDecimal() ?: return null }
+        if (setCount == null || setCount <= 0 || reps == null || reps <= 0 || weight == null || weight < 0.0) return null
+        if (rpe != null && rpe !in 1.0..10.0) return null
+        return List(setCount) { ParsedSet(weight = weight, reps = reps, rpe = rpe) }
+    }
+
+    /**
+     * Sets for "80kgx10, 70kgx10" or a single "80kg x 5". The whole notation must be a list of valid
+     * sets, so a malformed tail ("80kgx10, 70kgx") rejects the whole line instead of dropping sets.
+     * More than one set is flagged as a drop set.
+     */
+    private fun weightFirstSets(notation: String): List<ParsedSet>? {
+        if (!weightFirstListRegex.matches(notation)) return null
+        val sets = weightFirstSetRegex.findAll(notation).toList().map { match ->
+            val weight = match.groupValues[1].toDecimal()
+            val reps = match.groupValues[2].toIntOrNull()
+            if (weight == null || weight < 0.0 || reps == null || reps <= 0) return null
+            ParsedSet(weight = weight, reps = reps)
+        }
+        return if (sets.size > 1) sets.map { it.copy(isDropSet = true) } else sets
+    }
+
+    private fun String.toDecimal(): Double? = replace(',', '.').toDoubleOrNull()?.takeIf { it.isFinite() }
 
     /**
      * Finds an exercise in the catalog by exact name or alias (case-insensitive).
@@ -288,6 +288,6 @@ data class ParsedWorkout(
 data class ParsedSet(
     val weight: Double,
     val reps: Int,
-    val rpe: Int? = null,
+    val rpe: Double? = null,
     val isDropSet: Boolean = false
 )

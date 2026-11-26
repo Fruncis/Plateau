@@ -89,7 +89,7 @@ class ImportParserTest {
         val set = success.workouts[0].sets[0]
         assertEquals(80.0, set.weight, 0.001)
         assertEquals(10, set.reps)
-        assertEquals(8, set.rpe)
+        assertEquals(8.0, set.rpe!!, 0.0)
     }
 
     @Test
@@ -220,5 +220,98 @@ class ImportParserTest {
         val split = ImportParser.splitLine("Esercizio Sconosciuto 3x10 50kg")
         val result = ImportParser.parse("Squat" + split.notation, catalog)
         assertTrue(result is ImportResult.Success)
+    }
+
+    private fun single(input: String): ParsedWorkout {
+        val result = ImportParser.parse(input, catalog)
+        assertTrue("Input: $input -> $result", result is ImportResult.Success)
+        return (result as ImportResult.Success).workouts.single()
+    }
+
+    private fun unmatched(input: String): ImportResult.UnmatchedLine {
+        val result = ImportParser.parse(input, catalog)
+        assertTrue("Input: $input -> $result", result is ImportResult.Partial)
+        return (result as ImportResult.Partial).unmatchedLines.single()
+    }
+
+    @Test
+    fun `accepts a space between weight and kg`() {
+        val w = single("Panca piana 3x8 85 kg")
+        assertEquals(3, w.sets.size)
+        assertEquals(85.0, w.sets[0].weight, 0.0)
+        assertEquals(8, w.sets[0].reps)
+    }
+
+    @Test
+    fun `kg unit and x separator are case insensitive`() {
+        assertEquals(100.0, single("Squat 4x8 100KG").sets[0].weight, 0.0)
+        assertEquals(4, single("Squat 4X8 100Kg").sets.size)
+    }
+
+    @Test
+    fun `accepts Italian decimal comma in weight and rpe`() {
+        assertEquals(82.5, single("Panca piana 3x10 82,5kg").sets[0].weight, 0.0)
+        assertEquals(82.5, single("Panca piana 3x10 82.5 kg").sets[0].weight, 0.0)
+        assertEquals(7.5, single("Panca piana 3x10 80kg @7,5").sets[0].rpe!!, 0.0)
+    }
+
+    @Test
+    fun `accepts decimal rpe and spaced at sign`() {
+        assertEquals(8.5, single("Squat 4x8 100KG @8.5").sets[0].rpe!!, 0.0)
+        assertEquals(9.0, single("Squat 4x8 100kg @ 9").sets[0].rpe!!, 0.0)
+    }
+
+    @Test
+    fun `rpe outside one to ten stays unmatched`() {
+        unmatched("Squat 4x8 100kg @10.5")
+        unmatched("Squat 4x8 100kg @0")
+    }
+
+    @Test
+    fun `weight first single set Row 80kg x 5 parses as one non drop set`() {
+        val catalogWithRow = catalog + catalog[0].copy(id = "ex_row", name = "Row", aliases = "[]")
+        val result = ImportParser.parse("Row 80kg x 5", catalogWithRow) as ImportResult.Success
+        val set = result.workouts.single().sets.single()
+        assertEquals(80.0, set.weight, 0.0)
+        assertEquals(5, set.reps)
+        assertTrue(!set.isDropSet)
+    }
+
+    @Test
+    fun `weight first notation accepts spaces case and decimal comma`() {
+        val sets = single("Panca piana 80 KG x 10, 72,5kg X 8").sets
+        assertEquals(listOf(80.0, 72.5), sets.map { it.weight })
+        assertEquals(listOf(10, 8), sets.map { it.reps })
+        assertTrue(sets.all { it.isDropSet })
+    }
+
+    @Test
+    fun `malformed drop set tail makes the line unmatched with suggestions`() {
+        for (input in listOf("Panca piana 80kgx10, 70kgx", "Panca piana 80kgx10, 70kgx10,", "Panca piana 80kgx10, abc")) {
+            val line = unmatched(input)
+            assertEquals(input, line.line)
+            assertTrue("Input: $input -> ${line.suggestions}", line.suggestions.contains("Panca piana"))
+        }
+    }
+
+    @Test
+    fun `invalid drop set values return suggestions`() {
+        val line = unmatched("Panca piana 80kgx0, 70kgx10")
+        assertTrue(line.suggestions.contains("Panca piana"))
+    }
+
+    @Test
+    fun `suggestions use the exercise text not the whole line`() {
+        assertTrue(unmatched("Pnca piana 3x10 80kg").suggestions.contains("Panca piana"))
+        assertTrue(unmatched("Sqat 4x8 100kg @11").suggestions.contains("Squat"))
+        assertTrue(unmatched("Pnca piana 80kgx10, 70kgx10").suggestions.contains("Panca piana"))
+        assertTrue(unmatched("Pnca piana 3x10").suggestions.contains("Panca piana"))
+    }
+
+    @Test
+    fun `internal whitespace in exercise names is normalised`() {
+        assertEquals("Panca piana", single("Panca    piana 3x10 80kg").exerciseName)
+        assertEquals("Panca piana", single("Panca	piana 80kgx10").exerciseName)
+        assertEquals("Stacco da terra", ImportParser.splitLine("Stacco   da  terra 3x5 140kg").exerciseName)
     }
 }

@@ -16,7 +16,7 @@ class ImportParserTest {
     )
 
     @Test
-    fun `parses standard Strong format: Exercise 3x10 80kg`() {
+    fun `parses standard Strong format Exercise 3x10 80kg`() {
         val input = "Panca piana 3x10 80kg"
         val result = ImportParser.parse(input, catalog)
 
@@ -34,7 +34,7 @@ class ImportParserTest {
     }
 
     @Test
-    fun `parses multiple set formats: 3x10, 3×10, 3x 10, 3 x 10`() {
+    fun `parses multiple set formats 3x10 and 3 times 10 and spaced variants`() {
         val inputs = listOf(
             "Panca piana 3x10 80kg",
             "Panca piana 3×10 80kg",
@@ -54,7 +54,7 @@ class ImportParserTest {
     }
 
     @Test
-    fun `fuzzy matches exercise aliases: "Bench press" -> "Panca piana"`() {
+    fun `matches exercise alias Bench press to Panca piana`() {
         val input = "Bench press 3x10 80kg"
         val result = ImportParser.parse(input, catalog)
 
@@ -80,7 +80,7 @@ class ImportParserTest {
     }
 
     @Test
-    fun `handles RPE notation: 3x10 80kg @8`() {
+    fun `handles RPE notation 3x10 80kg at 8`() {
         val input = "Panca piana 3x10 80kg @8"
         val result = ImportParser.parse(input, catalog)
 
@@ -93,7 +93,7 @@ class ImportParserTest {
     }
 
     @Test
-    fun `handles drop sets: 80kgx10, 70kgx10, 60kgx10`() {
+    fun `handles drop sets 80kgx10 70kgx10 60kgx10`() {
         val input = "Panca piana 80kgx10, 70kgx10, 60kgx10"
         val result = ImportParser.parse(input, catalog)
 
@@ -159,7 +159,7 @@ class ImportParserTest {
 
     @Test
     fun `Levenshtein distance suggests similar exercises for typos`() {
-        val input = "Pnca piana 3x10 80kg" // typo in "Panca"
+        val input = "Squat 4x8 100kg\nPnca piana 3x10 80kg" // typo in "Panca"; valid first line keeps result Partial
         val result = ImportParser.parse(input, catalog)
 
         assertTrue(result is ImportResult.Partial)
@@ -167,5 +167,23 @@ class ImportParserTest {
         assertEquals(1, partial.unmatchedLines.size)
         val suggestions = partial.unmatchedLines[0].suggestions
         assertTrue(suggestions.contains("Panca piana"))
+    }
+
+    @Test
+    fun `blank lines between exercises are skipped`() {
+        val result = ImportParser.parse("\n\nPanca piana 3x10 80kg\n   \n\nSquat 4x8 100kg\n\n", catalog)
+
+        assertTrue(result is ImportResult.Success)
+        assertEquals(2, (result as ImportResult.Success).workouts.size)
+    }
+
+    @Test
+    fun `malformed set notation never crashes and surfaces as unmatched`() {
+        val inputs = listOf("Panca piana 3x", "Panca piana x10 80kg", "Panca piana 3x10 kg", "3x10 80kg", "Panca piana 0x10 80kg", "Panca piana 3x10 80kg @99", "x", "@8")
+        for (input in inputs) {
+            val result = ImportParser.parse("Squat 4x8 100kg\n$input", catalog)
+            assertTrue("Input: $input -> $result", result is ImportResult.Partial)
+            assertEquals(1, (result as ImportResult.Partial).unmatchedLines.size)
+        }
     }
 }

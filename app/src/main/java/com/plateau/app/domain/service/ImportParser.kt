@@ -22,9 +22,6 @@ object ImportParser {
     /** Regex for drop set format: 80kgx10, 70kgx10, 60kgx10 */
     private val dropSetRegex = """(\d+(?:\.\d+)?)kgx(\d+)""".toRegex()
 
-    /** Regex for drop set line: Exercise 80kgx10, 70kgx10, 60kgx10 */
-    private val dropSetLineRegex = """^(.+?)\s+(.+)$""".toRegex()
-
     /**
      * Parses workout import text into structured data.
      *
@@ -93,34 +90,26 @@ object ImportParser {
         }
 
         // Try drop set format: Exercise 80kgx10, 70kgx10, 60kgx10
-        val dropSetLineMatch = dropSetLineRegex.matchEntire(line)
-        if (dropSetLineMatch != null) {
-            val exerciseName = dropSetLineMatch.groupValues[1].trim()
-            val setsPart = dropSetLineMatch.groupValues[2].trim()
-
-            val dropSetMatches = dropSetRegex.findAll(setsPart).toList()
-            if (dropSetMatches.isNotEmpty()) {
+        val firstDrop = dropSetRegex.find(line)
+        if (firstDrop != null && firstDrop.range.first > 0) {
+            val exerciseName = line.substring(0, firstDrop.range.first).trim()
+            val dropSetMatches = dropSetRegex.findAll(line.substring(firstDrop.range.first)).toList()
+            if (exerciseName.isNotEmpty()) {
                 val matchedExercise = findExercise(exerciseName, catalog)
-                if (matchedExercise != null) {
-                    val sets = dropSetMatches.mapNotNull { match ->
-                        val weight = match.groupValues[1].toDoubleOrNull()
-                        val reps = match.groupValues[2].toIntOrNull()
-                        if (weight == null || !weight.isFinite() || weight < 0.0 || reps == null || reps <= 0) {
-                            null
-                        } else {
-                            ParsedSet(weight = weight, reps = reps, isDropSet = true)
-                        }
+                    ?: return ParseLineResult.Unmatched(line, findSuggestions(exerciseName, catalog))
+                val sets = dropSetMatches.mapNotNull { match ->
+                    val weight = match.groupValues[1].toDoubleOrNull()
+                    val reps = match.groupValues[2].toIntOrNull()
+                    if (weight == null || !weight.isFinite() || weight < 0.0 || reps == null || reps <= 0) {
+                        null
+                    } else {
+                        ParsedSet(weight = weight, reps = reps, isDropSet = true)
                     }
-                    if (sets.size != dropSetMatches.size || sets.isEmpty()) {
-                        return ParseLineResult.Unmatched(line, emptyList())
-                    }
-                    return ParseLineResult.Success(ParsedWorkout(
-                        exerciseName = matchedExercise.name,
-                        sets = sets
-                    ))
-                } else {
-                    return ParseLineResult.Unmatched(line, findSuggestions(exerciseName, catalog))
                 }
+                if (sets.size != dropSetMatches.size || sets.isEmpty()) {
+                    return ParseLineResult.Unmatched(line, emptyList())
+                }
+                return ParseLineResult.Success(ParsedWorkout(exerciseName = matchedExercise.name, sets = sets))
             }
         }
 
@@ -133,7 +122,7 @@ object ImportParser {
     }
 
     /**
-     * Finds an exercise in the catalog by exact name, aliases, or fuzzy match.
+     * Finds an exercise in the catalog by exact name or alias (case-insensitive).
      */
     private fun findExercise(inputName: String, catalog: List<Exercise>): Exercise? {
         val normalizedInput = inputName.lowercase().trim()
@@ -154,33 +143,9 @@ object ImportParser {
             }
         }
 
-        // 3. Fuzzy match with Levenshtein distance ≤ 2
-        var bestMatch: Exercise? = null
-        var bestDistance = Int.MAX_VALUE
-
-        for (exercise in catalog) {
-            val nameDistance = levenshteinDistance(normalizedInput, exercise.name.lowercase())
-            if (nameDistance <= 2 && nameDistance < bestDistance) {
-                bestDistance = nameDistance
-                bestMatch = exercise
-            }
-
-            // Also check aliases for fuzzy match
-            try {
-                val aliases = json.decodeFromString<List<String>>(exercise.aliases)
-                for (alias in aliases) {
-                    val aliasDistance = levenshteinDistance(normalizedInput, alias.lowercase())
-                    if (aliasDistance <= 2 && aliasDistance < bestDistance) {
-                        bestDistance = aliasDistance
-                        bestMatch = exercise
-                    }
-                }
-            } catch (e: Exception) {
-                // Ignore malformed JSON
-            }
-        }
-
-        return bestMatch
+        // Fuzzy (Levenshtein) candidates are intentionally NOT auto-accepted:
+        // they surface as suggestions on an unmatched line for user review.
+        return null
     }
 
     /**

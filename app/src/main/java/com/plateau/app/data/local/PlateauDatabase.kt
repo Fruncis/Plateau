@@ -1,8 +1,6 @@
 package com.plateau.app.data.local
 
-import android.content.Context
 import androidx.room.Database
-import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import com.plateau.app.data.local.dao.BodyMetricDao
@@ -63,20 +61,4 @@ abstract class PlateauDatabase : RoomDatabase() {
     abstract fun photoAnalysisDao(): PhotoAnalysisDao
     abstract fun goalDao(): GoalDao
     abstract fun userProfileDao(): UserProfileDao
-
-    companion object {
-        @Volatile private var INSTANCE: PlateauDatabase? = null
-
-        fun getInstance(context: Context): PlateauDatabase {
-            return INSTANCE ?: synchronized(this) {
-                val instance = Room.databaseBuilder(
-                    context.applicationContext,
-                    PlateauDatabase::class.java,
-                    "plateau.db"
-                ).fallbackToDestructiveMigration().build()
-                INSTANCE = instance
-                instance
-            }
-        }
-    }
 }

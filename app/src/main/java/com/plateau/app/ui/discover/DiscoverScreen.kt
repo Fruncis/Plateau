@@ -3,6 +3,7 @@ package com.plateau.app.ui.discover
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -24,6 +25,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import com.plateau.app.data.local.entity.Exercise
 import com.plateau.app.data.local.entity.MuscleGroup
@@ -141,13 +144,16 @@ private fun FilterRow(
         Text(title, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Row(modifier = Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
             options.forEach { (label, value) ->
-                MuscleChip(
-                    label = label,
-                    emphasized = selected == value,
+                val isSelected = selected == value
+                Box(
                     modifier = Modifier
                         .heightIn(min = Size.minTouch)
-                        .clickable(role = Role.Button) { onSelect(if (selected == value) null else value) }
-                )
+                        .semantics { this.selected = isSelected }
+                        .clickable(role = Role.Button) { onSelect(if (isSelected) null else value) },
+                    contentAlignment = Alignment.Center
+                ) {
+                    MuscleChip(label = label, emphasized = isSelected)
+                }
             }
         }
     }

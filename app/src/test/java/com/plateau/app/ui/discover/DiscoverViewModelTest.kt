@@ -19,8 +19,8 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
-import org.mockito.kotlin.any
 import org.mockito.kotlin.anyOrNull
+import org.mockito.kotlin.atLeastOnce
 import org.mockito.kotlin.doAnswer
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.isNull
@@ -112,7 +112,7 @@ class DiscoverViewModelTest {
         val job = launch(UnconfinedTestDispatcher(testScheduler)) { vm.uiState.collect() }
 
         vm.onSearchChanged("   ")
-        verify(repo, org.mockito.kotlin.atLeastOnce()).getFilteredExercises(isNull(), isNull(), isNull(), isNull(), isNull())
+        verify(repo, atLeastOnce()).getFilteredExercises(isNull(), isNull(), isNull(), isNull(), isNull())
         assertFalse(vm.uiState.value.activeFilters.hasActiveFilters)
 
         vm.onSearchChanged(" panca ")

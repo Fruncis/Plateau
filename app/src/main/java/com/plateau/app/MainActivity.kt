@@ -33,6 +33,8 @@ import com.plateau.app.ui.discover.DiscoverViewModel
 import com.plateau.app.ui.progress.ProgressViewModel
 import com.plateau.app.ui.photo.PhotoViewModel
 import com.plateau.app.ui.importreview.ImportReviewRoute
+import com.plateau.app.ui.importreview.LimitedSharedText
+import com.plateau.app.ui.importreview.limitSharedText
 import com.plateau.app.ui.importreview.ImportReviewViewModel
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -47,16 +49,17 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
-    private val sharedText = mutableStateOf<String?>(null)
+    private val sharedText = mutableStateOf<LimitedSharedText?>(null)
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         extractSharedText(intent)?.let { sharedText.value = it }
     }
 
-    private fun extractSharedText(intent: Intent?): String? =
+    /** Shared text, capped by [limitSharedText] because it travels in the nav route (saved state). */
+    private fun extractSharedText(intent: Intent?): LimitedSharedText? =
         if (intent?.action == Intent.ACTION_SEND && intent.type == "text/plain") {
-            intent.getStringExtra(Intent.EXTRA_TEXT)?.takeIf { it.isNotBlank() }
+            intent.getStringExtra(Intent.EXTRA_TEXT)?.takeIf { it.isNotBlank() }?.let(::limitSharedText)
         } else null
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -80,11 +83,11 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun AppNavHost(sharedText: String? = null, onSharedTextHandled: () -> Unit = {}) {
+fun AppNavHost(sharedText: LimitedSharedText? = null, onSharedTextHandled: () -> Unit = {}) {
     val navController = rememberNavController()
     LaunchedEffect(sharedText) {
         sharedText?.let {
-            navController.navigate(Destination.ImportReview(it).route)
+            navController.navigate(Destination.ImportReview(it.text, it.truncated).route)
             onSharedTextHandled()
         }
     }
@@ -157,11 +160,15 @@ fun AppNavHost(sharedText: String? = null, onSharedTextHandled: () -> Unit = {})
         }
         composable(
             route = Destination.importReviewPattern,
-            arguments = listOf(navArgument("input") { type = NavType.StringType })
+            arguments = listOf(
+                navArgument("input") { type = NavType.StringType },
+                navArgument("truncated") { type = NavType.BoolType; defaultValue = false }
+            )
         ) { backStackEntry ->
             ImportReviewRoute(
                 viewModel = hiltViewModel<ImportReviewViewModel>(),
                 input = backStackEntry.arguments?.getString("input").orEmpty(),
+                truncated = backStackEntry.arguments?.getBoolean("truncated") ?: false,
                 onCancel = { navController.popBackStack() },
                 onImported = { navController.popBackStack("home", inclusive = false) }
             )

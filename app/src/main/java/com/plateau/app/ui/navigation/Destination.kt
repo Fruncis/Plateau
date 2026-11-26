@@ -9,10 +9,11 @@ sealed class Destination(val route: String, val label: String) {
     data object Discover : Destination("discover", "Scopri")
     data object Progress : Destination("progress", "Progressi")
     data object Photo : Destination("photo", "Foto")
-    data class ImportReview(val input: String) : Destination("import-review/${Uri.encode(input)}", "Importa")
+    data class ImportReview(val input: String, val truncated: Boolean = false) :
+        Destination("import-review/${Uri.encode(input)}?truncated=$truncated", "Importa")
 
     companion object {
-        const val importReviewPattern = "import-review/{input}"
+        const val importReviewPattern = "import-review/{input}?truncated={truncated}"
     }
 }
 

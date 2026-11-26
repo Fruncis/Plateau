@@ -30,7 +30,8 @@ class ImportReviewViewModel @Inject constructor(
             importResult = result,
             editedWorkouts = result.workoutsOrEmpty(),
             unmatched = result.unmatchedOrEmpty(),
-            primaryMuscleNames = muscleNames
+            primaryMuscleNames = muscleNames,
+            error = (result as? ImportResult.Failure)?.message
         )
     }
 
@@ -128,6 +129,3 @@ private fun ImportResult.unmatchedOrEmpty(): List<ImportResult.UnmatchedLine> = 
     is ImportResult.Partial -> unmatchedLines
     else -> emptyList()
 }
-
-// This ViewModel has no existing equivalent; the screen and navigation route will call it.
-// User instruction: "continua"

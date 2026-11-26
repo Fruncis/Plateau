@@ -1,5 +1,6 @@
 package com.plateau.app
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import dagger.hilt.android.AndroidEntryPoint
@@ -8,6 +9,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -44,8 +46,21 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+    private val sharedText = mutableStateOf<String?>(null)
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        extractSharedText(intent)?.let { sharedText.value = it }
+    }
+
+    private fun extractSharedText(intent: Intent?): String? =
+        if (intent?.action == Intent.ACTION_SEND && intent.type == "text/plain") {
+            intent.getStringExtra(Intent.EXTRA_TEXT)?.takeIf { it.isNotBlank() }
+        } else null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (savedInstanceState == null) sharedText.value = extractSharedText(intent)
         enableEdgeToEdge()
         setContent {
             PlateauTheme {
@@ -53,7 +68,10 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    AppNavHost()
+                    AppNavHost(
+                        sharedText = sharedText.value,
+                        onSharedTextHandled = { sharedText.value = null }
+                    )
                 }
             }
         }
@@ -61,8 +79,14 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun AppNavHost() {
+fun AppNavHost(sharedText: String? = null, onSharedTextHandled: () -> Unit = {}) {
     val navController = rememberNavController()
+    LaunchedEffect(sharedText) {
+        sharedText?.let {
+            navController.navigate(Destination.ImportReview(it).route)
+            onSharedTextHandled()
+        }
+    }
     val currentDestination = remember { mutableStateOf<Destination>(Destination.Home) }
 
     androidx.navigation.compose.NavHost(navController, "home") {

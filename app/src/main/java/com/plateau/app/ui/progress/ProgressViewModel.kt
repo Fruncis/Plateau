@@ -114,5 +114,7 @@ class ProgressViewModel @Inject constructor(
 
 internal fun completionPercent(done: Int, planned: Int): Int? {
     if (planned <= 0) return null
-    return Math.round(done.coerceAtLeast(0) * 100.0 / planned).toInt().coerceIn(0, 100)
+    if (done >= planned) return 100
+    // Arrotonda al piu vicino ma non mostra 100% finche il lavoro non e completo.
+    return Math.round(done.coerceAtLeast(0) * 100.0 / planned).toInt().coerceIn(0, 99)
 }

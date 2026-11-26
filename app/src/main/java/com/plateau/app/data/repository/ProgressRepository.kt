@@ -54,13 +54,14 @@ class ProgressRepository @Inject constructor(
     fun getVolumeMetrics(
         muscleGroupId: String,
         weeks: Int = VOLUME_WEEKS,
-        now: Long = System.currentTimeMillis()
+        now: Long = System.currentTimeMillis(),
+        zone: ZoneId = ZoneId.systemDefault()
     ): Flow<VolumeMetrics?> {
-        val currentWeekStart = startOfWeekMillis(now)
-        val firstWeekStart = startOfWeekMillis(now, weeksBack = weeks - 1)
+        val currentWeekStart = startOfWeekMillis(now, zone = zone)
+        val firstWeekStart = startOfWeekMillis(now, weeksBack = weeks - 1, zone = zone)
         return setLogDao.getByPrimaryMuscleSince(muscleGroupId, firstWeekStart).map { logs ->
             val muscleName = muscleGroupDao.getById(muscleGroupId)?.name ?: return@map null
-            val weekStarts = (weeks - 1 downTo 0).map { startOfWeekMillis(now, weeksBack = it) }
+            val weekStarts = (weeks - 1 downTo 0).map { startOfWeekMillis(now, weeksBack = it, zone = zone) }
             val weeklyData = weekStarts.mapIndexed { i, start ->
                 val end = weekStarts.getOrNull(i + 1) ?: Long.MAX_VALUE
                 WeeklyVolumePoint(start, logs.filter { it.completedAt in start until end }.sumOf { it.weight * it.reps })

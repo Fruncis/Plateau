@@ -44,7 +44,7 @@ class ProgressViewModelTest {
         whenever(progressRepo.getSetLogsSince(any())).thenReturn(logs)
         whenever(progressRepo.getRecentPRs(any(), any())).thenReturn(flowOf(emptyList()))
         whenever(progressRepo.getDoubleProgressionSuggestions()).thenReturn(flowOf(emptyList()))
-        whenever(progressRepo.getVolumeMetrics(any(), any(), any())).thenReturn(flowOf(null))
+        whenever(progressRepo.getVolumeMetrics(any(), any(), any(), any())).thenReturn(flowOf(null))
     }
 
     @After

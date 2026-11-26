@@ -32,7 +32,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.material3.Surface
 
 /**
- * Anello di completamento: traccia in `outline`, arco in `extras.progress`, valore in `NumberDisplay`
+ * Anello di completamento: traccia in `outline`, arco in `extras.chartProgress`, valore in `NumberDisplay`
  * (`extras.progressText`) con [label] sotto. Per una percentuale assente passa `progress = 0f` e `value = "N/D"`.
  */
 @Composable
@@ -46,7 +46,7 @@ fun CompletionRing(
 ) {
     val animated by animateFloatAsState(targetValue = progress.coerceIn(0f, 1f), label = "ring")
     val track = MaterialTheme.colorScheme.outline
-    val fill = PlateauTheme.extras.progress
+    val fill = PlateauTheme.extras.chartProgress
     Box(
         modifier = modifier
             .size(size)

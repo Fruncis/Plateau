@@ -63,7 +63,7 @@ fun E1RMChart(
     val measurer = rememberTextMeasurer()
     val labelStyle = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
     val gridColor = MaterialTheme.colorScheme.outline
-    val lineColor = PlateauTheme.extras.progress
+    val lineColor = PlateauTheme.extras.chartProgress
     val pointColor = PlateauTheme.extras.progressText
     val selectedRing = MaterialTheme.colorScheme.onSurface
 

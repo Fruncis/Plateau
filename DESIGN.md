@@ -22,8 +22,9 @@ Se cambia un valore, aggiorna `tokens.json`, il codice Kotlin e questo file nell
 | `PlateauTheme.extras.progress` | #7DD3A8 | #7DD3A8 | riempimenti positivi (check, pallini) |
 | `PlateauTheme.extras.progressText` | #7DD3A8 | #17744D | numeri/testo positivi (record, +kg) |
 | `PlateauTheme.extras.accentText` | #FF7A3D | #B93F08 | arancione usato come testo |
+| `PlateauTheme.extras.chartProgress` | #7DD3A8 | #17744D | segni grafici dei dati: arco degli anelli, linea e1RM, barre a target |
 
-Regole: l'arancione `primary` non va mai usato come testo su sfondo chiaro (usa `accentText`); il verde come testo usa sempre `progressText`.
+Regole: l'arancione `primary` non va mai usato come testo su sfondo chiaro (usa `accentText`); il verde come testo usa sempre `progressText`; i segni grafici dei dati (anelli, linee, barre) usano `chartProgress` (almeno 3:1 sulla superficie, WCAG 1.4.11).
 Il tema segue il sistema (`isSystemInDarkTheme()`).
 
 ## Tipografia

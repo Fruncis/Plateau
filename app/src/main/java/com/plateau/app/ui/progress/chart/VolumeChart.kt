@@ -34,7 +34,7 @@ import com.plateau.app.ui.theme.Spacing
 
 /**
  * Volume load settimanale: una barra per settimana, linea tratteggiata `primary` al target.
- * Barre in `extras.progress` se raggiungono il target, in `primary` se sotto.
+ * Barre in `extras.chartProgress` se raggiungono il target, in `primary` se sotto.
  * Tocca o tieni premuto una barra per vedere settimana, volume e % del target.
  * Senza volume registrato mostra uno stato vuoto e ignora i tocchi.
  */
@@ -57,7 +57,7 @@ fun VolumeChart(
     val measurer = rememberTextMeasurer()
     val labelStyle = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
     val gridColor = MaterialTheme.colorScheme.outline
-    val reached = PlateauTheme.extras.progress
+    val reached = PlateauTheme.extras.chartProgress
     val below = MaterialTheme.colorScheme.primary
     val selectedRing = MaterialTheme.colorScheme.onSurface
 

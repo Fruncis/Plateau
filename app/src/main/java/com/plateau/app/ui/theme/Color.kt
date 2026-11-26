@@ -47,7 +47,8 @@ data class PlateauExtras(
     val onProgress: Color,   // contenuto sopra "progress"
     val progressText: Color, // testo/numeri positivi (record, +kg), leggibile nel tema
     val accentText: Color,   // arancione usato COME TESTO (tab attivo, serie in corso)
+    val chartProgress: Color, // segni grafici dei dati (arco, linea, barre): contrasto >= 3:1 sulla superficie
 )
 
-internal val DarkExtras = PlateauExtras(Brand.Moss, Brand.Basalt, Brand.Moss, Brand.Ember)
-internal val LightExtras = PlateauExtras(Brand.Moss, Brand.Basalt, Brand.MossInk, Brand.EmberInk)
+internal val DarkExtras = PlateauExtras(Brand.Moss, Brand.Basalt, Brand.Moss, Brand.Ember, Brand.Moss)
+internal val LightExtras = PlateauExtras(Brand.Moss, Brand.Basalt, Brand.MossInk, Brand.EmberInk, Brand.MossInk)

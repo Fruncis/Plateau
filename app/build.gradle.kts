@@ -23,7 +23,6 @@ android {
 
     buildFeatures {
         compose = true
-        viewBinding = true
     }
 
     packaging {
@@ -52,11 +51,6 @@ android {
             jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
         }
     }
-
-    composeOptions {
-    }
-
-    namespace = "com.plateau.app"
 
     kapt {
         correctErrorTypes = true
@@ -115,8 +109,6 @@ dependencies {
 
     // DataStore
     implementation("androidx.datastore:datastore-preferences:$datastore_version")
-    implementation("androidx.datastore:datastore-preferences-rxjava3:$datastore_version")
-    kapt("androidx.datastore:datastore-preferences:$datastore_version")
 
     // WorkManager
     implementation("androidx.work:work-runtime-ktx:$workmanager_version")

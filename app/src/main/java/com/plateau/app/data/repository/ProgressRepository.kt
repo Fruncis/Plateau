@@ -32,7 +32,7 @@ class ProgressRepository @Inject constructor(
             }
             val currentE1RM = dataPoints.last().e1rm
             val bestE1RM = dataPoints.maxByOrNull { it.e1rm }?.e1rm ?: currentE1RM
-            val change30Days = currentE1RM - dataPoints.firstOrNull()?.e1rm ?: 0.0
+            val change30Days = currentE1RM - (dataPoints.firstOrNull()?.e1rm ?: currentE1RM)
 
             E1RMTrend(exerciseId, exercise.name, currentE1RM, bestE1RM, change30Days, dataPoints)
         }

@@ -12,6 +12,7 @@ import com.plateau.app.domain.model.SetLogSummary
 import com.plateau.app.domain.model.VolumeTrend
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -75,16 +76,16 @@ class ExerciseRepository @Inject constructor(
         }
     }
 
-    fun getExerciseDetail(exerciseId: String): Flow<ExerciseDetail?> = exerciseDao.getById(exerciseId).map { exercise ->
-        exercise?.let { buildExerciseDetail(it) }
-    }.distinctUntilChanged()
+    fun getExerciseDetail(exerciseId: String): Flow<ExerciseDetail?> = flow {
+        emit(exerciseDao.getById(exerciseId)?.let { buildExerciseDetail(it) })
+    }
 
-    private fun buildExerciseDetail(exercise: Exercise): ExerciseDetail {
+    private suspend fun buildExerciseDetail(exercise: Exercise): ExerciseDetail {
         val primaryMuscle = muscleGroupDao.getById(exercise.primaryMuscleId)!!
         val secondaryMuscle = exercise.secondaryMuscleId?.let { muscleGroupDao.getById(it) }
 
-        val lastSet = setLogDao.getLastSet(exercise.id)?.let { (weight, reps) ->
-            SetLogSummary(weight, reps, System.currentTimeMillis())
+        val lastSet = setLogDao.getLastSet(exercise.id)?.let { last ->
+            SetLogSummary(last.weight, last.reps, System.currentTimeMillis())
         }
 
         val e1rm = lastSet?.let { calculateE1RM(it.weight, it.reps) }

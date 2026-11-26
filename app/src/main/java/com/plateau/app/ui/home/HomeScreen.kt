@@ -1,5 +1,7 @@
 package com.plateau.app.ui.home
 
+import com.plateau.app.ui.theme.NumberLarge
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -10,7 +12,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsStateWithLifecycle
+import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.plateau.app.domain.model.PlanDayWithExercises
+import com.plateau.app.ui.theme.PlateauTheme
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -42,8 +47,8 @@ fun HomeScreen(
         ) {
             // Main content
             androidx.compose.foundation.layout.Box(modifier = Modifier
-                .fillMaxSize()
-                .padding(bottom = Size.tabBarHeight + Spacing.xl)
+                .weight(1f)
+                .fillMaxWidth()
             ) {
                 Column(
                     modifier = Modifier
@@ -68,11 +73,13 @@ fun HomeScreen(
                     WeekStrip(viewModel.currentWeekday)
 
                     // Active workout card
-                    activePlan?.let { plan ->
-                        viewModel.getTodaysWorkout(plan)?.let { todaysWorkout ->
-                            ActiveWorkoutCard(todaysWorkout)
-                        } ?: RestDayCard()
-                    } ?: EmptyStateCard()
+                    val plan = activePlan
+                    val todaysWorkout = viewModel.getTodaysWorkout(plan)
+                    when {
+                        plan == null -> EmptyStateCard()
+                        todaysWorkout != null -> ActiveWorkoutCard(todaysWorkout)
+                        else -> RestDayCard()
+                    }
 
                     // Last PR card
                     LastPRCard()
@@ -100,10 +107,10 @@ private fun WeekStrip(currentDay: Int) {
         horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
     ) {
         days.forEachIndexed { index, day ->
-            val isToday = index == currentDay
+            val isToday = index + 1 == currentDay
             Surface(
                 modifier = Modifier
-                    .fillMaxWidth()
+                    .weight(1f)
                     .height(60.dp),
                 color = if (isToday) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
                 shape = MaterialTheme.shapes.medium
@@ -122,7 +129,7 @@ private fun WeekStrip(currentDay: Int) {
 }
 
 @Composable
-private fun ActiveWorkoutCard(workout: PlanDetail.PlanDayWithExercises) {
+private fun ActiveWorkoutCard(workout: PlanDayWithExercises) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = MaterialTheme.colorScheme.surface,
@@ -158,7 +165,7 @@ private fun ExerciseRow(name: String, setsReps: String, lastSet: String) {
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(crossAxisSize = androidx.compose.ui.layout.LayoutWeight(fill = true)) {
+        Column(modifier = Modifier.weight(1f)) {
             Text(name, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
             Text(setsReps, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(lastSet, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
@@ -210,11 +217,11 @@ private fun LastPRCard() {
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(crossAxisSize = androidx.compose.ui.layout.LayoutWeight(fill = true)) {
+                Column(modifier = Modifier.weight(1f)) {
                     Text("Panca piana", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
                     Text("100 kg × 8 (e1RM 127 kg)", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                Text("+2,5 kg", style = MaterialTheme.typography.numberLarge, color = MaterialTheme.colorScheme.primary)
+                Text("+2,5 kg", style = NumberLarge, color = PlateauTheme.extras.progressText)
             }
         }
     }

@@ -1,5 +1,7 @@
 package com.plateau.app.ui.plans
 
+import com.plateau.app.ui.theme.PlateauTheme
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -37,8 +39,8 @@ fun PlansScreen(
         ) {
             // Main content
             androidx.compose.foundation.layout.Box(modifier = Modifier
-                .fillMaxSize()
-                .padding(bottom = Size.tabBarHeight + Spacing.xl)
+                .weight(1f)
+                .fillMaxWidth()
             ) {
                 Column(
                     modifier = Modifier
@@ -114,7 +116,7 @@ private fun PlanDayRow(label: String, muscles: String, isToday: Boolean) {
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(crossAxisSize = androidx.compose.ui.layout.LayoutWeight(fill = true)) {
+        Column(modifier = Modifier.weight(1f)) {
             Text(label, style = MaterialTheme.typography.titleMedium, color = if (isToday) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
             if (muscles.isNotBlank()) {
                 Text(muscles, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -155,7 +157,7 @@ private fun ArchivedPlanCard(name: String, period: String, status: String) {
                 Text(name, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
                 Text(period, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            Text(status, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.progressText)
+            Text(status, style = MaterialTheme.typography.labelMedium, color = PlateauTheme.extras.progressText)
         }
     }
 }

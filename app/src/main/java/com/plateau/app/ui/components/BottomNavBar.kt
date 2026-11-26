@@ -5,13 +5,20 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -42,8 +49,8 @@ fun BottomNavBar(
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .height(Size.tabBarHeight)
-            .padding(bottom = Spacing.md),
+            .navigationBarsPadding()
+            .height(Size.tabBarHeight),
         color = MaterialTheme.colorScheme.surface,
         shape = MaterialTheme.shapes.large,
         shadowElevation = 8.dp
@@ -65,30 +72,29 @@ fun BottomNavBar(
 }
 
 @Composable
-private fun BottomNavItem(
+private fun RowScope.BottomNavItem(
     destination: Destination,
     isSelected: Boolean,
     onClick: () -> Unit
 ) {
     val icon = when (destination) {
-        Destination.Home -> Event
-        Destination.Session -> FitnessCenter
-        Destination.Plans -> Description
-        Destination.Discover -> Search
-        Destination.Progress -> TrendingUp
-        Destination.Photo -> CameraAlt
-        is Destination.ImportReview -> Description
+        Destination.Home -> Icons.Filled.Event
+        Destination.Session -> Icons.Filled.FitnessCenter
+        Destination.Plans -> Icons.Filled.Description
+        Destination.Discover -> Icons.Filled.Search
+        Destination.Progress -> Icons.AutoMirrored.Filled.TrendingUp
+        Destination.Photo -> Icons.Filled.CameraAlt
+        is Destination.ImportReview -> Icons.Filled.Description
     }
 
     val color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
 
-    androidx.compose.foundation.layout.Box(
+    Box(
         modifier = Modifier
-            .fillMaxWidth()
-            .height(Size.tabBarHeight)
-            .fillMaxSize()
-            .padding(Spacing.sm)
-            .clickable { onClick() },
+            .weight(1f)
+            .fillMaxHeight()
+            .clickable { onClick() }
+            .padding(Spacing.xs),
         contentAlignment = Alignment.Center
     ) {
         Column(

@@ -7,14 +7,14 @@ import com.plateau.app.data.repository.SessionRepository
 import com.plateau.app.data.repository.UserProfileRepository
 import com.plateau.app.data.repository.SeedRepository
 import com.plateau.app.domain.usecase.GetActivePlanUseCase
-import dagger.hilt.android.scopes.Singleton
+import javax.inject.Singleton
 import dagger.Module
 import dagger.Provides
-import dagger.hilt.android.scopes.InstallIn
-import dagger.hilt.android.components.SingletonComponent
+import dagger.hilt.InstallIn
+import dagger.hilt.components.SingletonComponent
 
 @Module
-@InstallIn(SingletonComponent::class.java)
+@InstallIn(SingletonComponent::class)
 object RepositoryModule {
 
     @Provides

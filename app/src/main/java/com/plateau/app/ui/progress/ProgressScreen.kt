@@ -1,5 +1,11 @@
 package com.plateau.app.ui.progress
 
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material3.Icon
+import com.plateau.app.ui.theme.PlateauTheme
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -39,8 +45,8 @@ fun ProgressScreen(
         ) {
             // Main content
             androidx.compose.foundation.layout.Box(modifier = Modifier
-                .fillMaxSize()
-                .padding(bottom = Size.tabBarHeight + Spacing.xl)
+                .weight(1f)
+                .fillMaxWidth()
             ) {
                 Column(
                     modifier = Modifier
@@ -93,7 +99,9 @@ private fun ExerciseSelector() {
                 Text("Panca piana", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
                 MuscleChip("Petto", emphasized = true)
             }
-            androidx.compose.material.icons.filled.ExpandMore(
+            Icon(
+                imageVector = Icons.Filled.ExpandMore,
+                contentDescription = "Cambia esercizio",
                 modifier = Modifier.size(24.dp),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -145,11 +153,11 @@ private fun E1RMTrendCard() {
                 }
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("Best", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text("130 kg", style = NumberLarge, color = MaterialTheme.colorScheme.progressText)
+                    Text("130 kg", style = NumberLarge, color = PlateauTheme.extras.progressText)
                 }
                 Column(horizontalAlignment = Alignment.End) {
                     Text("Δ 30g", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text("+5 kg", style = NumberLarge, color = MaterialTheme.colorScheme.progressText)
+                    Text("+5 kg", style = NumberLarge, color = PlateauTheme.extras.progressText)
                 }
             }
         }
@@ -240,17 +248,17 @@ private fun PRCard(exercise: String, bestSet: String, e1rm: String, `when`: Stri
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column(crossAxisSize = androidx.compose.ui.layout.LayoutWeight(fill = true)) {
+            Column(modifier = Modifier.weight(1f)) {
                 Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm), verticalAlignment = Alignment.CenterVertically) {
                     Text(exercise, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
                     if (isNew) {
-                        Text("NUOVO", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.progressText)
+                        Text("NUOVO", style = MaterialTheme.typography.labelSmall, color = PlateauTheme.extras.progressText)
                     }
                 }
                 Text(bestSet, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Column(horizontalAlignment = Alignment.End) {
-                Text(e1rm, style = NumberLarge, color = MaterialTheme.colorScheme.progressText)
+                Text(e1rm, style = NumberLarge, color = PlateauTheme.extras.progressText)
                 Text(`when`, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }

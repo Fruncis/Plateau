@@ -24,10 +24,3 @@ data class PlanExerciseWithDetails(
     val exercise: Exercise,
     val lastSets: List<SetLogSummary>
 )
-
-@Serializable
-data class SetLogSummary(
-    val weight: Double,
-    val reps: Int,
-    val date: Long
-)

@@ -1,0 +1,48 @@
+# Gradle
+.gradle/
+build/
+*/build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# Local configuration
+local.properties
+*.iml
+
+# IDE
+.idea/
+*.iws
+*.ipr
+out/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Android
+*.apk
+*.ap_
+*.aab
+*.so
+*.jar
+*.class
+*.dex
+*.o
+*.obj
+*.orig
+*.pyc
+*.rbc
+*.swp
+*.bak
+*.tmp
+*.log
+*.trace
+
+# Generated
+generated/
+out/
+.gradle/
+.m2/
+
+# Test reports
+**/test-results/
+**/coverage/
